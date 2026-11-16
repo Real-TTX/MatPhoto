@@ -1,0 +1,70 @@
+{
+  "id": "/",
+  "name": "MatPhoto",
+  "short_name": "MatPhoto",
+  "description": "Your photos and videos from your storages. Deine Fotos und Videos aus deinen Speichern.",
+  "start_url": "/Photos",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": [
+    "standalone",
+    "minimal-ui"
+  ],
+  "orientation": "any",
+  "background_color": "#f5f4f1",
+  "theme_color": "#b81f8a",
+  "categories": [
+    "photo",
+    "lifestyle",
+    "utilities"
+  ],
+  "icons": [
+    {
+      "src": "/img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/img/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Photos / Fotos",
+      "short_name": "Photos",
+      "url": "/Photos",
+      "icons": [{ "src": "/img/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Albums / Alben",
+      "short_name": "Albums",
+      "url": "/Albums",
+      "icons": [{ "src": "/img/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Import / Importieren",
+      "short_name": "Import",
+      "url": "/Import",
+      "icons": [{ "src": "/img/icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Favourites / Favoriten",
+      "short_name": "Favourites",
+      "url": "/Favorites",
+      "icons": [{ "src": "/img/icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

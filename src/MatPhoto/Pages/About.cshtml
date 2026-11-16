@@ -1,0 +1,47 @@
+@page "/About"
+@model MatPhoto.Pages.AboutModel
+@{
+    ViewData["Title"] = L["About.Title"].Value;
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["About.Title"].Value, null) };
+    ViewData["Width"] = "narrow";
+}
+
+<div class="mat-card">
+    <div class="mat-card__body md-about">
+        <div class="md-about__head">
+            @Ui.Logo("lg")
+            <div>
+                <h2>@Ui.AppName</h2>
+                <p>@L["About.Tagline"]</p>
+            </div>
+        </div>
+        <dl class="mat-kv">
+            <dt>@L["About.Version"]</dt><dd class="mat-mono">@AppInfo.Version</dd>
+            <dt>@L["About.Channel"]</dt><dd>@L["About.Channel." + Model.Channel]</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="mat-card">
+    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("info")@L["About.Keys"]</h2></div>
+    <div class="mat-card__body">
+        <dl class="mat-kv">
+            <dt class="mat-mono">← →</dt><dd>@L["About.Keys.Arrows"]</dd>
+            <dt class="mat-mono">i</dt><dd>@L["About.Keys.Info"]</dd>
+            <dt class="mat-mono">f</dt><dd>@L["About.Keys.Favorite"]</dd>
+            <dt class="mat-mono">z</dt><dd>@L["About.Keys.Zoom"]</dd>
+            <dt class="mat-mono">@L["About.Keys.Space"]</dt><dd>@L["About.Keys.Slideshow"]</dd>
+            <dt class="mat-mono">Shift + @L["About.Keys.Click"]</dt><dd>@L["About.Keys.Range"]</dd>
+            <dt class="mat-mono">/</dt><dd>@L["About.Keys.Search"]</dd>
+        </dl>
+    </div>
+</div>
+
+<div class="mat-card">
+    <div class="mat-card__body">
+        <p>@L["About.Family"]</p>
+        <p class="md-muted">@L["About.Libraries"]</p>
+        <p class="md-muted">@L["About.Places"]</p>
+        <p class="md-muted">@L["About.Author"]</p>
+    </div>
+</div>

@@ -1,0 +1,30 @@
+@page "/Albums/View/{id:long}"
+@model MatPhoto.Pages.Albums.ViewModel
+@{
+    var a = Model.Album;
+    var title = a.Title.Length > 0 ? a.Title : a.Name;
+    ViewData["Title"] = title;
+    ViewData["PageSub"] = AlbumText.Dates(a.AlbumDate, a.StartDate, a.EndDate) + " · " + L["Explore.Count", a.MediaCount.ToString("N0")].Value + " · " + Ui.Bytes(a.Bytes);
+    ViewData["NavKey"] = "albums";
+    ViewData["Width"] = "wide";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Albums.Title"].Value, "/Albums"), (title, null) };
+}
+@section TopActions {
+    <partial name="_GridZoom" />
+    @if (a.CanEdit && a.Path.Length > 0)
+    {
+        <a class="mat-btn mat-btn--ghost mat-btn--icon" href="/Albums/Edit?id=@a.Id" aria-label="@L["Albums.Edit"]" data-tip="@L["Albums.Edit"]">@Ui.Icon("edit")</a>
+    }
+}
+
+<p class="md-album-where">@Ui.Icon("folder")<span class="mat-mono">@a.StorageName / @(a.Path.Length == 0 ? "" : a.Path)</span></p>
+@if (!string.IsNullOrWhiteSpace(a.Description))
+{
+    <p class="md-album-text">@a.Description</p>
+}
+
+<partial name="_PhotoGrid" model="@(new GridModel("album:" + a.Id, title, "album", L["Albums.EmptyAlbum"].Value, L["Albums.EmptyAlbumText"].Value) { AlbumId = a.Id })" />
+
+@section Scripts {
+    <script type="module" src="~/js/photos.js" asp-append-version="true"></script>
+}

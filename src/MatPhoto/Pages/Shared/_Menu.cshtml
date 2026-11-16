@@ -1,0 +1,76 @@
+@model (MenuModel Menu, string Area)
+@inject CurrentUser Me
+@*
+    The menus (SHELL-01 .. SHELL-19): one panel per menu of the switcher at the foot (SHELL-15), the one of the page shown.
+    - photos:   Import (the main action), Photos, Explore, Albums, Favourites, Duplicates, Imports, the lists of the person
+    - settings: profile, password, my data
+    - admin:    users, storages, scans, connections, activity, system (administrators only)
+    A page names what it shows: ViewData["NavKey"] ("photos", "explore", "albums", "favorites", "duplicates", "imports", "list-4").
+*@
+@{
+    var m = Model.Menu;
+    var path = Context.Request.Path.Value ?? "/";
+    var key = ViewData["NavKey"] as string;
+
+    bool Under(string prefix) => path.Equals(prefix, StringComparison.OrdinalIgnoreCase) || path.StartsWith(prefix + "/", StringComparison.OrdinalIgnoreCase);
+    string Cls(bool active) => "mat-nav__item" + (active ? " is-active" : string.Empty);
+    string Cur(bool active) => active ? "page" : null!;
+    string Badge(int n) => n > 99 ? "99+" : n.ToString(System.Globalization.CultureInfo.InvariantCulture);
+}
+<nav class="mat-nav__scroll" aria-label="@L["Shell.Area.Photos"]" data-nav-panel="photos" hidden="@(Model.Area != "photos")">
+    <ul class="mat-nav__list">
+        @if (m.CanImport)
+        {
+            <li><a class="mat-nav__item mat-nav__item--primary" href="/Import">@Ui.Icon("import")<span>@L["Import.Title"]</span></a></li>
+        }
+        <li><a class="@Cls(key == "photos")" href="/Photos" aria-current="@Cur(key == "photos")">@Ui.Icon("image")<span>@L["Photos.Title"]</span></a></li>
+        <li><a class="@Cls(key == "explore")" href="/Explore" aria-current="@Cur(key == "explore")">@Ui.Icon("compass")<span>@L["Explore.Title"]</span></a></li>
+        <li><a class="@Cls(key == "albums")" href="/Albums" aria-current="@Cur(key == "albums")">@Ui.Icon("album")<span>@L["Albums.Title"]</span></a></li>
+        <li><a class="@Cls(key == "favorites")" href="/Favorites" aria-current="@Cur(key == "favorites")">@Ui.Icon("heart")<span>@L["Favorites.Title"]</span></a></li>
+        <li><a class="@Cls(key == "duplicates")" href="/Duplicates" aria-current="@Cur(key == "duplicates")">@Ui.Icon("duplicate")<span>@L["Duplicates.Title"]</span></a></li>
+        <li>
+            <a class="@Cls(key == "imports")" href="/Import/History" aria-current="@Cur(key == "imports")">@Ui.Icon("clock")<span>@L["Import.History"]</span>
+                @if (m.ImportsWaiting > 0)
+                {
+                    <span class="mat-nav__badge mat-nav__badge--info">@Badge(m.ImportsWaiting)<span class="mat-sr-only"> @L["Import.Waiting"]</span></span>
+                }
+            </a>
+        </li>
+
+        <li class="mat-nav__group mat-nav__group--action" role="presentation">
+            <span class="mat-nav__group-title">@L["Lists.Title"]</span>
+            <a class="mat-nav__group-action" href="/Lists" aria-label="@L["Lists.Manage"]" aria-current="@Cur(path.Equals("/Lists", StringComparison.OrdinalIgnoreCase))">@Ui.Icon("settings")</a>
+        </li>
+        @if (m.Lists.Count == 0)
+        {
+            <li><a class="@Cls(Under("/Lists/Edit"))" href="/Lists/Edit">@Ui.Icon("list-plus")<span>@L["Lists.New"]</span></a></li>
+        }
+        @foreach (var l in m.Lists)
+        {
+            var on = key == "list-" + l.Id;
+            <li><a class="@Cls(on)" href="/Lists/View/@l.Id" aria-current="@Cur(on)">@Ui.Icon("list", colour: l.Colour)<span>@l.Name</span></a></li>
+        }
+    </ul>
+</nav>
+
+<nav class="mat-nav__scroll" aria-label="@L["Settings.Title"]" data-nav-panel="settings" hidden="@(Model.Area != "settings")">
+    <ul class="mat-nav__list">
+        <li><a class="@Cls(path.Equals("/Account", StringComparison.OrdinalIgnoreCase))" href="/Account" aria-current="@Cur(path.Equals("/Account", StringComparison.OrdinalIgnoreCase))">@Ui.Icon("user")<span>@L["Settings.Profile"]</span></a></li>
+        <li><a class="@Cls(Under("/Account/Password"))" href="/Account/Password" aria-current="@Cur(Under("/Account/Password"))">@Ui.Icon("lock")<span>@L["Password.Title"]</span></a></li>
+        <li><a class="@Cls(Under("/Account/Data"))" href="/Account/Data" aria-current="@Cur(Under("/Account/Data"))">@Ui.Icon("database")<span>@L["Data.Title"]</span></a></li>
+    </ul>
+</nav>
+
+@if (Me.IsAdmin)
+{
+    <nav class="mat-nav__scroll" aria-label="@L["Admin.Title"]" data-nav-panel="admin" hidden="@(Model.Area != "admin")">
+        <ul class="mat-nav__list">
+            <li><a class="@Cls(Under("/Admin/Users"))" href="/Admin/Users" aria-current="@Cur(Under("/Admin/Users"))">@Ui.Icon("user-circle")<span>@L["Users.Title"]</span></a></li>
+            <li><a class="@Cls(Under("/Admin/Storages"))" href="/Admin/Storages" aria-current="@Cur(Under("/Admin/Storages"))">@Ui.Icon("server")<span>@L["Storages.Title"]</span></a></li>
+            <li><a class="@Cls(Under("/Admin/Scans"))" href="/Admin/Scans" aria-current="@Cur(Under("/Admin/Scans"))">@Ui.Icon("refresh")<span>@L["Scans.Title"]</span></a></li>
+            <li><a class="@Cls(Under("/Admin/Connections"))" href="/Admin/Connections" aria-current="@Cur(Under("/Admin/Connections"))">@Ui.Icon("plug")<span>@L["Connections.Title"]</span></a></li>
+            <li><a class="@Cls(Under("/Admin/Activity"))" href="/Admin/Activity" aria-current="@Cur(Under("/Admin/Activity"))">@Ui.Icon("activity")<span>@L["Activity.Title"]</span></a></li>
+            <li><a class="@Cls(Under("/Admin/System"))" href="/Admin/System" aria-current="@Cur(Under("/Admin/System"))">@Ui.Icon("settings")<span>@L["System.Title"]</span></a></li>
+        </ul>
+    </nav>
+}

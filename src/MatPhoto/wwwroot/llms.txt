@@ -1,0 +1,26 @@
+# MatPhoto
+
+> MatPhoto is a self-hosted photo library in the browser, like the photo apps people know, that leaves the photos where they are: on the storages of the installation (folders of the server and shares of a NAS over SMB, WebDAV, SFTP and FTP). Every folder with photos is an album (its name is human readable, e.g. "2023.11.09 Wedding Julius"), lists link photos of any album for a project, places, types, years and cameras become automatic albums, duplicates are found, and a smart import sorts new photos into suggested albums. It is a Progressive Web App.
+
+Everything except the start page needs an account. The interface is available in English and German. No photo is ever sent to another server: places are read offline (GeoNames), thumbnails are made on the server.
+
+## What a person can do
+
+- Scroll through every photo and video of the storages they may see, month by month and day by day (justified rows), select photos (also a range or a whole day).
+- Open a photo or a video full screen: the next and the previous one are loaded ahead, swipe and keys, zoom, a slideshow, Live Photos, the info (date, camera, exposure, place, album).
+- Mark favourites, put photos on lists (own or shared), move photos or whole albums into the trash folder of their storage (nothing is deleted for good).
+- Browse the albums (the folders), create an album (a new folder) and rename it (the folder is renamed).
+- Explore places (towns and countries), types (videos, screenshots, selfies, panoramas, Live Photos, animations, RAW), years and cameras.
+- Search albums, lists, places, files, cameras, years and types.
+- Find duplicates (the same file, or a similar picture) and keep one of each group.
+- Import from the device (files, folders, drag & drop) or from a folder of a storage: dates, places and duplicates are recognised, albums suggested, the files copied or moved into folders.
+
+## For administrators
+
+- Storages (local, SMB, WebDAV, SFTP, FTP) with a scan interval, folders to leave out, read-only, and who may see or change them.
+- The cache of the thumbnails in the data volume or in a folder of a storage (the NAS), its sizes and quality; how the import groups and names albums.
+- Sign-in through MatIdentity and mail through MatSMTP (both optional, set up by Mattiverse); the platform API of the Mat family under /api.
+
+## Links
+
+- [Start page](/)

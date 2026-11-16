@@ -1,0 +1,100 @@
+@page "/Admin/Storages"
+@model MatPhoto.Pages.Admin.Storages.IndexModel
+@using MatPhoto.Services.Storages
+@{
+    ViewData["Title"] = L["Storages.Title"].Value;
+    ViewData["PageSub"] = L["Storages.Admin.Sub", Model.StorageRoot].Value;
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Admin.Title"].Value, null), (L["Storages.Title"].Value, null) };
+}
+@section Head {
+
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("server", L[first ? "Storages.Admin.Empty" : "Storages.Admin.NoMatch"].Value, L[first ? "Storages.Admin.EmptyText" : "Lists.ChangeTools"].Value, first, "/Admin/Storages/Edit", L["Storages.New"].Value, Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <md-table caption="@L["Storages.Title"]">
+            <thead>
+                <tr>
+                    <th scope="col">@L["Common.Name"]</th>
+                    <th scope="col">@L["Storages.Col.Kind"]</th>
+                    <th scope="col" class="mat-hide-md">@L["Storages.Col.Where"]</th>
+                    <th scope="col" class="mat-num">@L["Storages.Col.Photos"]</th>
+                    <th scope="col">@L["Common.Status"]</th>
+                    <th scope="col" class="mat-num mat-hide-sm">@L["Storages.Col.Free"]</th>
+                    <th scope="col"><span class="mat-sr-only">@L["Common.Actions"]</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Model.Items)
+                {
+                    var space = l.Status?.Space;
+                    <tr>
+                        <td data-label="@L["Common.Name"]">
+                            <div class="md-loc-cell">
+                                <a href="/Admin/Storages/Edit?id=@l.Id">@l.Name</a>
+                                <small class="md-muted">@(l.ForEveryone ? L["Storages.ForEveryoneShort"].Value : L["Storages.PeopleCount", l.People].Value)@(l.IsReadOnly ? " · " + L["Storages.ReadOnly"].Value : string.Empty)</small>
+                            </div>
+                        </td>
+                        <td data-label="@L["Storages.Col.Kind"]"><span class="md-loc-kind">@Ui.Icon(l.Kind == StorageKind.Local ? "server" : "network")<span>@StorageAdmin.KindName(l.Kind)</span></span></td>
+                        <td data-label="@L["Storages.Col.Where"]" class="mat-mono mat-hide-md md-loc-where">@l.Where</td>
+                        <td data-label="@L["Storages.Col.Photos"]" class="mat-num mat-mono">@(l.IsLibrary ? l.Media.ToString("N0", System.Globalization.CultureInfo.CurrentUICulture) : "–")</td>
+                        <td data-label="@L["Common.Status"]">
+                            @if (!l.IsActive)
+                            {
+                                <span class="mat-pill mat-pill--plain">@L["Storages.Inactive"]</span>
+                            }
+                            else if (l.Status is null)
+                            {
+                                <span class="mat-pill mat-pill--plain">@L["Storages.NotChecked"]</span>
+                            }
+                            else if (l.Status.Reachable)
+                            {
+                                <span class="mat-pill mat-pill--ok" title="@L["Storages.CheckedAt", Dates.Stamp(l.Status.CheckedUtc, Model.Zone)]">@L["Storages.Reachable"]</span>
+                            }
+                            else
+                            {
+                                <span class="mat-pill mat-pill--error" title="@l.Status.Message">@L["Storages.Unreachable"]</span>
+                            }
+                        </td>
+                        <td data-label="@L["Storages.Col.Free"]" class="mat-num mat-mono mat-hide-sm">
+                            @if (space is not null && l.IsActive)
+                            {
+                                <span title="@L["Storages.SpaceFree", Ui.Bytes(space.Free), Ui.Bytes(space.Total)]">@Ui.Bytes(space.Free)</span>
+                            }
+                            else
+                            {
+                                <span class="md-muted">–</span>
+                            }
+                        </td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Admin/Storages/Access?id=@l.Id" aria-label="@L["Storages.AccessNamed", l.Name]" data-tip="@L["Storages.Tab.Access"]">@Ui.Icon("users")</a>
+                                <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Admin/Storages/Edit?id=@l.Id" aria-label="@L["Common.EditNamed", l.Name]" data-tip="@L["Common.Edit"]">@Ui.Icon("edit")</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </md-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/Admin/Storages/Edit">@Ui.Icon("plus")<span>@L["Storages.New"]</span></a>
+        @if (Model.Toolbar.Total > 0)
+        {
+            <form method="post" asp-page-handler="Check" class="md-loc-inline">
+                <button type="submit" class="mat-btn mat-btn--secondary">@Ui.Icon("refresh")<span>@L["Storages.CheckAll"]</span></button>
+            </form>
+        }
+    </div>
+</div>

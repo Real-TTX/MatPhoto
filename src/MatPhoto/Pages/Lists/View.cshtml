@@ -1,0 +1,28 @@
+@page "/Lists/View/{id:long}"
+@model MatPhoto.Pages.Lists.ViewModel
+@{
+    var c = Model.List;
+    ViewData["Title"] = c.Name;
+    ViewData["PageSub"] = L["Explore.Count", c.Count.ToString("N0")].Value + (c.IsShared ? " · " + L["Lists.SharedBy", c.IsMine ? L["Lists.You"].Value : c.OwnerName].Value : string.Empty);
+    ViewData["NavKey"] = "list-" + c.Id;
+    ViewData["Width"] = "wide";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Lists.Title"].Value, "/Lists"), (c.Name, null) };
+}
+@section TopActions {
+    <partial name="_GridZoom" />
+    @if (c.IsMine)
+    {
+        <a class="mat-btn mat-btn--ghost mat-btn--icon" href="/Lists/Edit?id=@c.Id" aria-label="@L["Lists.Edit"]" data-tip="@L["Lists.Edit"]">@Ui.Icon("edit")</a>
+    }
+}
+
+@if (!string.IsNullOrWhiteSpace(c.Description))
+{
+    <p class="md-album-text">@c.Description</p>
+}
+
+<partial name="_PhotoGrid" model="@(new GridModel("list:" + c.Id, c.Name, "list", L["Lists.EmptyList"].Value, L["Lists.EmptyListText"].Value) { ListId = c.Id, Days = false })" />
+
+@section Scripts {
+    <script type="module" src="~/js/photos.js" asp-append-version="true"></script>
+}

@@ -1,0 +1,16 @@
+@page "/Favorites"
+@{
+    ViewData["Title"] = L["Favorites.Title"].Value;
+    ViewData["PageSub"] = L["Favorites.Sub"].Value;
+    ViewData["NavKey"] = "favorites";
+    ViewData["Width"] = "wide";
+}
+@section TopActions {
+    <partial name="_GridZoom" />
+}
+
+<partial name="_PhotoGrid" model="@(new GridModel("favorites", L["Favorites.Title"].Value, "heart", L["Favorites.Empty"].Value, L["Favorites.EmptyText"].Value))" />
+
+@section Scripts {
+    <script type="module" src="~/js/photos.js" asp-append-version="true"></script>
+}

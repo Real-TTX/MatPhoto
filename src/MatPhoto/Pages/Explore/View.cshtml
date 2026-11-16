@@ -1,0 +1,17 @@
+@page "/Explore/View"
+@model MatPhoto.Pages.Explore.ViewModel
+@{
+    ViewData["Title"] = Model.Title;
+    ViewData["NavKey"] = "explore";
+    ViewData["Width"] = "wide";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Explore.Title"].Value, "/Explore"), (Model.Title, null) };
+}
+@section TopActions {
+    <partial name="_GridZoom" />
+}
+
+<partial name="_PhotoGrid" model="@(new GridModel(Model.Scope, Model.Title, "compass", L["Explore.NothingHere"].Value, L["Explore.NothingHereText"].Value))" />
+
+@section Scripts {
+    <script type="module" src="~/js/photos.js" asp-append-version="true"></script>
+}

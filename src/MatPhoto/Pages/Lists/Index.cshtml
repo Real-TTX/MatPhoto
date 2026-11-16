@@ -1,0 +1,60 @@
+@page "/Lists"
+@model MatPhoto.Pages.Lists.IndexModel
+@{
+    ViewData["Title"] = L["Lists.Title"].Value;
+    ViewData["PageSub"] = L["Lists.Sub"].Value;
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("list", L[first ? "Lists.Empty" : "Lists.NoMatch"].Value, L[first ? "Lists.EmptyText" : "Lists.ChangeTools"].Value, first, "/Lists/Edit", L["Lists.New"].Value, Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <md-table caption="@L["Lists.Title"]">
+            <thead>
+                <tr>
+                    <th scope="col">@L["Common.Name"]</th>
+                    <th scope="col" class="mat-num">@L["Photos.Title"]</th>
+                    <th scope="col" class="mat-hide-sm">@L["Lists.Owner"]</th>
+                    <th scope="col" class="mat-hide-md">@L["Lists.Updated"]</th>
+                    <th scope="col"><span class="mat-sr-only">@L["Common.Actions"]</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var l in Model.Items)
+                {
+                    <tr>
+                        <td data-label="@L["Common.Name"]" class="mat-table__primary">
+                            <div class="mat-table__name">
+                                <span class="md-thumb">@if (l.CoverId is { } c && l.CoverHash is { Length: >= 12 } h) { <img src="/media/@c/thumb?v=@h[..12]" alt="" loading="lazy" decoding="async" /> } else { @Ui.Icon("list", colour: l.Colour) }</span>
+                                <span><a href="/Lists/View/@l.Id">@l.Name</a>@if (l.IsShared) { <small class="md-muted">@Ui.Icon("users") @L["Lists.SharedShort"]</small> }</span>
+                            </div>
+                        </td>
+                        <td data-label="@L["Photos.Title"]" class="mat-num mat-mono">@l.Count</td>
+                        <td data-label="@L["Lists.Owner"]" class="mat-hide-sm">@(l.IsMine ? L["Lists.You"].Value : l.OwnerName)</td>
+                        <td data-label="@L["Lists.Updated"]" class="mat-mono mat-hide-md">@Dates.Stamp(l.UpdateDate, Model.Zone)</td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                @if (l.IsMine)
+                                {
+                                    <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Lists/Edit?id=@l.Id" aria-label="@L["Common.EditNamed", l.Name]" data-tip="@L["Common.Edit"]">@Ui.Icon("edit")</a>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </md-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/Lists/Edit">@Ui.Icon("list-plus")<span>@L["Lists.New"]</span></a>
+    </div>
+</div>

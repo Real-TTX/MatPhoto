@@ -1,0 +1,44 @@
+@page "/Albums/Edit"
+@model MatPhoto.Pages.Albums.EditModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["NavKey"] = "albums";
+    ViewData["Width"] = "narrow";
+    ViewData["Crumbs"] = Model.IsNew
+        ? new List<(string, string?)> { (L["Albums.Title"].Value, "/Albums"), (L["Common.New"].Value, null) }
+        : new List<(string, string?)> { (L["Albums.Title"].Value, "/Albums"), (Model.Heading, $"/Albums/View/{Model.Id}"), (L["Common.Edit"].Value, null) };
+}
+
+<form class="mat-form" method="post" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("album")@L["Albums.Folder"]</h2></div>
+        <div class="mat-card__body mat-form">
+            @if (Model.IsNew)
+            {
+                <md-field name="StorageId" kind="radios" label="@L["Albums.Storage"]" value="@Model.StorageId" options="Model.Storages" />
+                <md-field name="ParentFolder" label="@L["Albums.Parent"]" value="@Model.ParentFolder" maxlength="1000" optional mono hint="@L["Albums.Parent.Hint"]" autocomplete="off" />
+            }
+            else
+            {
+                <p class="md-album-where">@Ui.Icon("folder")<span class="mat-mono">@Model.Where</span></p>
+            }
+            @if (!Model.IsRoot)
+            {
+                <div class="mat-form__grid">
+                    <md-field name="Date" kind="date" label="@L["Albums.Date"]" value="@Model.Date" optional hint="@L["Albums.Date.Hint"]" />
+                    <md-field name="Title" label="@L["Albums.TitleField"]" value="@Model.Title" maxlength="110" required msg-required="@L["Common.NameRequired"]" autocomplete="off" />
+                </div>
+                <p class="mat-hint">@L["Albums.NameWillBe"] <strong class="mat-mono">@Model.Example</strong></p>
+            }
+        </div>
+    </div>
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("file-text")@L["Albums.About"]</h2></div>
+        <div class="mat-card__body mat-form">
+            <md-field name="Description" kind="textarea" label="@L["Albums.Description"]" value="@Model.Description" rows="3" maxlength="2000" optional hint="@L["Albums.Description.Hint"]" />
+        </div>
+    </div>
+    <md-buttons save="@L[Model.IsNew ? "Albums.Create" : "Common.Save"]" back="@(Model.IsNew ? "/Albums" : $"/Albums/View/{Model.Id}")" delete-handler="@(Model.IsNew || Model.IsRoot ? null : "Delete")"
+                delete-label="@L["Albums.Delete"]" delete-confirm="@L["Albums.DeleteConfirm", Model.FolderName]" />
+</form>

@@ -1,0 +1,53 @@
+@page "/Search"
+@model MatPhoto.Pages.Search.IndexModel
+@{
+    ViewData["Title"] = Model.Query.Length == 0 ? L["Search.Title"].Value : L["Search.ResultsFor", Model.Query].Value;
+    ViewData["SearchText"] = Model.Query;
+    ViewData["Width"] = "wide";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Search.Title"].Value, null) };
+}
+@section TopActions {
+    <partial name="_GridZoom" />
+}
+
+@if (Model.Query.Length == 0)
+{
+    <div class="mat-empty mat-empty--framed">
+        <span class="mat-empty__icon">@Ui.Icon("search")</span>
+        <div class="mat-empty__title">@L["Search.Title"]</div>
+        <p>@L["Search.Help"]</p>
+    </div>
+}
+else
+{
+    @if (Model.Albums.Count > 0 || Model.Lists.Count > 0)
+    {
+        <section class="md-section" aria-labelledby="search-albums">
+            <h2 class="md-section__title" id="search-albums">@Ui.Icon("album")@L["Search.AlbumsAndLists"]</h2>
+            <div class="md-cards">
+                @foreach (var a in Model.Albums)
+                {
+                    <a class="md-card" href="/Albums/View/@a.Id">
+                        <span class="md-card__media">@if (a.CoverId is { } c && a.CoverHash is { Length: >= 12 } h) { <img src="/media/@c/thumb?v=@h[..12]" alt="" loading="lazy" decoding="async" /> } else { @Ui.Icon("album", "md-card__placeholder") }</span>
+                        <span class="md-card__body"><span class="md-card__title">@Ui.Icon("album")<span>@a.Name</span></span><span class="md-card__meta">@L["Explore.Count", a.MediaCount.ToString("N0")]</span></span>
+                    </a>
+                }
+                @foreach (var l in Model.Lists)
+                {
+                    <a class="md-card" href="/Lists/View/@l.Id">
+                        <span class="md-card__media">@if (l.CoverId is { } c && l.CoverHash is { Length: >= 12 } h) { <img src="/media/@c/thumb?v=@h[..12]" alt="" loading="lazy" decoding="async" /> } else { @Ui.Icon("list", "md-card__placeholder") }</span>
+                        <span class="md-card__body"><span class="md-card__title">@Ui.Icon("list", colour: l.Colour)<span>@l.Name</span></span><span class="md-card__meta">@L["Explore.Count", l.Count.ToString("N0")]</span></span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
+    <section class="md-section" aria-labelledby="search-photos">
+        <h2 class="md-section__title" id="search-photos">@Ui.Icon("image")@L["Photos.Title"]</h2>
+        <partial name="_PhotoGrid" model="@(new GridModel("search:" + Model.Query, L["Photos.Title"].Value, "search", L["Search.NoPhotos"].Value, L["Search.Help"].Value))" />
+    </section>
+}
+
+@section Scripts {
+    <script type="module" src="~/js/photos.js" asp-append-version="true"></script>
+}

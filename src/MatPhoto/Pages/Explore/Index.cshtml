@@ -1,0 +1,60 @@
+@page "/Explore"
+@model MatPhoto.Pages.Explore.IndexModel
+@{
+    ViewData["Title"] = L["Explore.Title"].Value;
+    ViewData["PageSub"] = L["Explore.Sub"].Value;
+    ViewData["NavKey"] = "explore";
+    ViewData["Width"] = "wide";
+    var m = Model.Explore;
+}
+
+@if (m.Places.Count + m.Types.Count + m.Cameras.Count + m.Years.Count == 0)
+{
+    <div class="mat-empty mat-empty--framed">
+        <span class="mat-empty__icon">@Ui.Icon("compass")</span>
+        <div class="mat-empty__title">@L["Explore.Empty"]</div>
+        <p>@L["Explore.EmptyText"]</p>
+    </div>
+}
+else
+{
+    @if (m.Places.Count > 0)
+    {
+        <section class="md-section" aria-labelledby="explore-places">
+            <h2 class="md-section__title" id="explore-places">@Ui.Icon("map-pin")@L["Explore.Places"]</h2>
+            <partial name="_Cards" model="m.Places" />
+        </section>
+    }
+    @if (m.Countries.Count > 1)
+    {
+        <section class="md-section" aria-labelledby="explore-countries">
+            <h2 class="md-section__title" id="explore-countries">@Ui.Icon("globe")@L["Explore.Countries"]</h2>
+            <partial name="_Cards" model="m.Countries" />
+        </section>
+    }
+    @if (m.Types.Count > 0)
+    {
+        <section class="md-section" aria-labelledby="explore-types">
+            <h2 class="md-section__title" id="explore-types">@Ui.Icon("sparkles")@L["Explore.Types"]</h2>
+            <partial name="_Cards" model="m.Types" />
+        </section>
+    }
+    @if (m.Years.Count > 0)
+    {
+        <section class="md-section" aria-labelledby="explore-years">
+            <h2 class="md-section__title" id="explore-years">@Ui.Icon("calendar")@L["Explore.Years"]</h2>
+            <partial name="_Cards" model="m.Years" />
+        </section>
+    }
+    @if (m.Cameras.Count > 0)
+    {
+        <section class="md-section" aria-labelledby="explore-cameras">
+            <h2 class="md-section__title" id="explore-cameras">@Ui.Icon("camera")@L["Explore.Cameras"]</h2>
+            <partial name="_Cards" model="m.Cameras" />
+        </section>
+    }
+    <section class="md-section" aria-labelledby="explore-people">
+        <h2 class="md-section__title" id="explore-people">@Ui.Icon("users")@L["Explore.People"]</h2>
+        <p class="md-muted">@L["Explore.People.Soon"]</p>
+    </section>
+}

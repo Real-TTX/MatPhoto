@@ -1,0 +1,75 @@
+# MatPhoto - Local (builds the image from this folder) with pgAdmin
+#   ./scripts/redeploy.ps1              (rebuilds and starts the stack: the way to test every change)
+#   docker compose -f docker-compose.local.yml up -d --build
+#   App:      http://localhost:4830
+#   pgAdmin:  http://localhost:4831   (no sign-in; database password: matphoto)
+#   Postgres: localhost:4832          (for "dotnet run" outside Docker, see appsettings.Development.json)
+#   Sample photos: ./sample-data is /storage/sample in the container (Administration -> Storages -> New: Local folder /storage/sample)
+name: matphoto-local
+
+services:
+  web:
+    build: .
+    image: matphoto:local
+    restart: unless-stopped
+    ports:
+      - "4830:4830"
+    volumes:
+      - web-data:/data
+      - ./sample-data:/storage/sample
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    ports:
+      - "4832:5432"
+    environment:
+      POSTGRES_DB: matphoto
+      POSTGRES_USER: matphoto
+      POSTGRES_PASSWORD: matphoto
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U matphoto -d matphoto"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    restart: unless-stopped
+    ports:
+      - "4831:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@matphoto.example.com
+      PGADMIN_DEFAULT_PASSWORD: matphoto
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+      PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED: "False"
+    configs:
+      - source: servers
+        target: /pgadmin4/servers.json
+    volumes:
+      - pgadmin-data:/var/lib/pgadmin
+    depends_on:
+      - db
+
+configs:
+  servers:
+    content: |
+      {"Servers": {"1": {"Name": "MatPhoto (local)", "Group": "Servers", "Host": "db", "Port": 5432, "MaintenanceDB": "matphoto", "Username": "matphoto", "SSLMode": "prefer"}}}
+
+volumes:
+  web-data:
+  db-data:
+  pgadmin-data:
+
+# A fixed subnet: on a machine with many stacks Docker runs out of address pools otherwise
+# ("all predefined address pools have been fully subnetted").
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 10.253.83.0/24

@@ -1,0 +1,51 @@
+@page "/Albums"
+@model MatPhoto.Pages.Albums.IndexModel
+@{
+    ViewData["Title"] = L["Albums.Title"].Value;
+    ViewData["PageSub"] = L["Albums.Sub"].Value;
+    ViewData["NavKey"] = "albums";
+    ViewData["Width"] = "wide";
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("album", L[first ? "Albums.Empty" : "Albums.NoMatch"].Value, L[first ? "Albums.EmptyText" : "Lists.ChangeTools"].Value, first, Model.CanCreate ? "/Albums/Edit" : null, L["Albums.New"].Value, Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <div class="md-cards md-cards--albums">
+            @foreach (var a in Model.Items)
+            {
+                <a class="md-card" href="/Albums/View/@a.Id">
+                    <span class="md-card__media">
+                        @if (a.CoverId is { } c && a.CoverHash is { Length: >= 12 } h)
+                        {
+                            <img src="/media/@c/thumb?v=@h[..12]" alt="" loading="lazy" decoding="async" />
+                        }
+                        else
+                        {
+                            @Ui.Icon("album", "md-card__placeholder")
+                        }
+                    </span>
+                    <span class="md-card__body">
+                        <span class="md-card__title">@(a.Title.Length > 0 ? a.Title : a.Name)</span>
+                        <span class="md-card__meta">@AlbumText.Dates(a.AlbumDate, a.StartDate, a.EndDate) · @L["Explore.Count", a.MediaCount.ToString("N0")]</span>
+                    </span>
+                </a>
+            }
+        </div>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    @if (Model.CanCreate)
+    {
+        <div class="mat-actions">
+            <a class="mat-btn mat-btn--primary" href="/Albums/Edit">@Ui.Icon("album-plus")<span>@L["Albums.New"]</span></a>
+        </div>
+    }
+</div>

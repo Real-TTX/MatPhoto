@@ -1,0 +1,37 @@
+@page "/Photos"
+@model MatPhoto.Pages.Photos.IndexModel
+@inject CurrentUser Me
+@{
+    ViewData["Title"] = L["Photos.Title"].Value;
+    ViewData["PageSub"] = Model.Sub;
+    ViewData["NavKey"] = "photos";
+    ViewData["Width"] = "wide";
+}
+@section TopActions {
+    <partial name="_GridZoom" />
+}
+
+@if (!Model.HasStorages)
+{
+    <div class="mat-empty mat-empty--first mat-empty--framed">
+        <span class="mat-empty__icon">@Ui.Icon("server")</span>
+        <div class="mat-empty__title">@L["Photos.NoStorage"]</div>
+        <p>@L[Me.IsAdmin ? "Photos.NoStorage.Admin" : "Photos.NoStorage.User"]</p>
+        @if (Me.IsAdmin)
+        {
+            <a class="mat-btn mat-btn--primary" href="/Admin/Storages/Edit">@Ui.Icon("plus")<span>@L["Storages.New"]</span></a>
+        }
+    </div>
+}
+else
+{
+    @if (Model.Pending > 0)
+    {
+        <div class="mat-alert mat-alert--info" role="status">@Ui.Icon("refresh")<div class="mat-alert__body">@L["Photos.Pending", Model.Pending]</div></div>
+    }
+    <partial name="_PhotoGrid" model="@(new GridModel("all", L["Photos.Title"].Value, "image", L["Photos.Empty"].Value, L["Photos.EmptyText"].Value, Model.CanImport ? "/Import" : null, L["Import.Title"].Value))" />
+}
+
+@section Scripts {
+    <script type="module" src="~/js/photos.js" asp-append-version="true"></script>
+}

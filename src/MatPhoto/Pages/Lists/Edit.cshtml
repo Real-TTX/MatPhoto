@@ -1,0 +1,24 @@
+@page "/Lists/Edit"
+@model MatPhoto.Pages.Lists.EditModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Width"] = "narrow";
+    ViewData["Crumbs"] = Model.IsNew
+        ? new List<(string, string?)> { (L["Lists.Title"].Value, "/Lists"), (L["Common.New"].Value, null) }
+        : new List<(string, string?)> { (L["Lists.Title"].Value, "/Lists"), (Model.Heading, $"/Lists/View/{Model.Id}"), (L["Common.Edit"].Value, null) };
+}
+
+<form class="mat-form" method="post" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+    <div class="mat-card">
+        <div class="mat-card__body mat-form">
+            <p class="mat-hint">@L["Lists.What"]</p>
+            <md-field name="Name" label="@L["Common.Name"]" required value="@Model.Name" maxlength="120" msg-required="@L["Common.NameRequired"]" placeholder="@L["Lists.NamePlaceholder"]" autocomplete="off" />
+            <md-field name="Description" kind="textarea" label="@L["Albums.Description"]" value="@Model.Description" rows="3" maxlength="2000" optional />
+            <md-field name="Colour" kind="colour" label="@L["Common.Color"]" value="@Model.Colour" optional />
+            <md-field name="IsShared" kind="switch" label="@L["Lists.ShareAll"]" value="@Model.IsShared.ToString()" hint="@L["Lists.ShareAll.Hint"]" />
+        </div>
+    </div>
+    <md-buttons save="@L[Model.IsNew ? "Lists.Create" : "Common.Save"]" back="@(Model.IsNew ? "/Lists" : $"/Lists/View/{Model.Id}")" delete-handler="@(Model.IsNew ? null : "Delete")"
+                delete-label="@L["Lists.Delete"]" delete-confirm="@L["Lists.DeleteConfirm", Model.Heading]" />
+</form>

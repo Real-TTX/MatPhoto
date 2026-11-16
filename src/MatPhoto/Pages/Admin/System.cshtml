@@ -1,0 +1,109 @@
+@page "/Admin/System"
+@model MatPhoto.Pages.Admin.SystemModel
+@{
+    ViewData["Title"] = L["System.Title"].Value;
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Admin.Title"].Value, null), (L["System.Title"].Value, null) };
+}
+
+<md-tabs label="@L["System.Tabs"]">
+    @foreach (var tab in SystemModel.Tabs)
+    {
+        <md-tab href="/Admin/System?tab=@tab" active="@(Model.Tab == tab)">@L["System.Tab." + tab]</md-tab>
+    }
+</md-tabs>
+
+<div class="mat-cols">
+    <div class="mat-col-12 mat-col-lg-7">
+        <form class="mat-form" method="post" novalidate>
+            <input type="hidden" name="Tab" value="@Model.Tab" />
+            <partial name="_FormSummary" model="ViewData.ModelState" />
+            @if (Model.Tab == "thumbnails")
+            {
+                <div class="mat-card">
+                    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("database")@L["System.Cache"]</h2></div>
+                    <div class="mat-card__body mat-form">
+                        <md-field name="CacheStorageId" kind="radios" label="@L["System.Cache.Where"]" value="@Model.CacheStorageId" options="Model.CacheChoices" hint="@L["System.Cache.Hint"]" />
+                        <md-field name="CacheFolder" label="@L["System.Cache.Folder"]" value="@Model.CacheFolder" maxlength="500" mono show-if="CacheStorageId" show-value="@string.Join(",", Model.CacheChoices.Where(c => c.Value.Length > 0).Select(c => c.Value))" hint="@L["System.Cache.Folder.Hint"]" autocomplete="off" />
+                    </div>
+                </div>
+                <div class="mat-card">
+                    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("image")@L["System.Thumbnails"]</h2></div>
+                    <div class="mat-card__body mat-form">
+                        <div class="mat-form__grid">
+                            <md-field name="ThumbnailHeight" kind="number" label="@L["System.ThumbnailHeight"]" value="@Model.ThumbnailHeight" min="160" max="1024" inputmode="numeric" hint="@L["System.ThumbnailHeight.Hint"]" />
+                            <md-field name="PreviewSize" kind="number" label="@L["System.PreviewSize"]" value="@Model.PreviewSize" min="800" max="4096" inputmode="numeric" hint="@L["System.PreviewSize.Hint"]" />
+                        </div>
+                        <md-field name="ThumbnailQuality" kind="number" label="@L["System.Quality"]" value="@Model.ThumbnailQuality" min="50" max="95" inputmode="numeric" hint="@L["System.Quality.Hint"]" />
+                        <div class="mat-alert mat-alert--info" role="note">@Ui.Icon("info")<div class="mat-alert__body">@L["System.Thumbnails.Again"]</div></div>
+                    </div>
+                </div>
+            }
+            else if (Model.Tab == "import")
+            {
+                <div class="mat-card">
+                    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("album")@L["System.AlbumNames"]</h2></div>
+                    <div class="mat-card__body mat-form">
+                        <md-field name="AlbumDateFormat" label="@L["System.AlbumDateFormat"]" value="@Model.AlbumDateFormat" maxlength="40" mono hint="@L["System.AlbumDateFormat.Hint", Model.Example]" autocomplete="off" />
+                    </div>
+                </div>
+                <div class="mat-card">
+                    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("wand")@L["System.Grouping"]</h2></div>
+                    <div class="mat-card__body mat-form">
+                        <div class="mat-form__grid">
+                            <md-field name="ImportGapHours" kind="number" label="@L["System.ImportGap"]" value="@Model.ImportGapHours" min="1" max="240" inputmode="numeric" hint="@L["System.ImportGap.Hint"]" />
+                            <md-field name="ImportDistanceKm" kind="number" label="@L["System.ImportDistance"]" value="@Model.ImportDistanceKm" min="1" max="5000" inputmode="numeric" hint="@L["System.ImportDistance.Hint"]" />
+                        </div>
+                        <md-field name="ImportStorageId" kind="radios" label="@L["System.ImportStorage"]" value="@Model.ImportStorageId" options="Model.ImportChoices" />
+                        <md-field name="ImportFolder" label="@L["System.ImportFolder"]" value="@Model.ImportFolder" maxlength="500" optional mono hint="@L["System.ImportFolder.Hint"]" autocomplete="off" />
+                    </div>
+                </div>
+                <div class="mat-card">
+                    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("duplicate")@L["Duplicates.Title"]</h2></div>
+                    <div class="mat-card__body mat-form">
+                        <md-field name="SimilarThreshold" kind="number" label="@L["System.Similar"]" value="@Model.SimilarThreshold" min="0" max="12" inputmode="numeric" hint="@L["System.Similar.Hint"]" />
+                    </div>
+                </div>
+            }
+            else
+            {
+                <div class="mat-card">
+                    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("settings")@L["System.Settings"]</h2></div>
+                    <div class="mat-card__body mat-form">
+                        <md-field name="RegistrationOpen" kind="switch" label="@L["System.RegistrationOpen"]" value="@Model.RegistrationOpen.ToString()" hint="@L["System.RegistrationOpen.Hint"]" />
+                        <md-field name="PublicUrl" kind="url" label="@L["System.PublicUrl"]" value="@Model.PublicUrl" placeholder="https://photos.example.com" optional="@(!Model.PublicUrlFixed)" disabled="@Model.PublicUrlFixed" hint="@L[Model.PublicUrlFixed ? "System.PublicUrl.Fixed" : "System.PublicUrl.Hint"]" />
+                        <md-field name="MaxUploadMb" kind="number" label="@L["System.MaxUpload"]" value="@Model.MaxUploadMb" min="0" inputmode="numeric" hint="@L["System.MaxUpload.Hint"]" />
+                    </div>
+                </div>
+            }
+            <md-buttons save="@L["Common.Save"]" back="/Photos" />
+        </form>
+        @if (Model.Tab == "general")
+        {
+            <form method="post" asp-page-handler="CleanUp" class="md-mt">
+                <button type="submit" class="mat-btn mat-btn--secondary" data-confirm="@L["System.CleanUp.Confirm"]" data-confirm-ok="@L["System.CleanUp"]">@Ui.Icon("broom")<span>@L["System.CleanUp"]</span></button>
+            </form>
+        }
+    </div>
+    <div class="mat-col-12 mat-col-lg-5">
+        <div class="mat-card">
+            <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("info")@L["System.About"]</h2></div>
+            <div class="mat-card__body">
+                <dl class="mat-kv">
+                    <dt>@L["System.Version"]</dt><dd class="mat-mono">@AppInfo.Version</dd>
+                    <dt>@L["System.Database"]</dt><dd class="mat-mono">@Model.Database</dd>
+                    <dt>@L["Users.Title"]</dt><dd>@Model.Counts.Users</dd>
+                    <dt>@L["Storages.Title"]</dt><dd>@Model.Counts.Storages</dd>
+                    <dt>@L["Photos.Title"]</dt><dd>@Model.Counts.Photos.ToString("N0")</dd>
+                    <dt>@L["Explore.Type.videos"]</dt><dd>@Model.Counts.Videos.ToString("N0")</dd>
+                    <dt>@L["Albums.Title"]</dt><dd>@Model.Counts.Albums.ToString("N0")</dd>
+                    <dt>@L["System.LibrarySize"]</dt><dd>@Ui.Bytes(Model.Counts.LibraryBytes)</dd>
+                    <dt>@L["System.Pending"]</dt><dd>@Model.Counts.Pending.ToString("N0")</dd>
+                    <dt>@L["System.Failed"]</dt><dd>@Model.Counts.Failed.ToString("N0")</dd>
+                    <dt>@L["System.CacheSize"]</dt><dd>@(Model.Counts.CacheBytes < 0 ? L["System.CacheOnStorage"].Value : Ui.Bytes(Model.Counts.CacheBytes))</dd>
+                    <dt>@L["System.Free"]</dt><dd>@(Model.FreeBytes < 0 ? "–" : Ui.Bytes(Model.FreeBytes))</dd>
+                    <dt>@L["System.Mail"]</dt><dd>@(Model.MailText ?? L["System.Mail.Off"].Value)</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+</div>

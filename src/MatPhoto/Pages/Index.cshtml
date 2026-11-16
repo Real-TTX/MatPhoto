@@ -1,0 +1,40 @@
+@page "/"
+@model MatPhoto.Pages.IndexModel
+@{
+    Layout = "_LayoutAuth";
+    ViewData["Title"] = Ui.AppName;
+    ViewData["Index"] = true;
+    ViewData["AuthClass"] = "md-landing";
+}
+
+<section class="md-hero">
+    @Ui.Logo("lg")
+    <h1>MatPhoto</h1>
+    <p class="md-hero__lead">@Html.Raw(L["Landing.Lead"].Value)</p>
+    <div class="mat-btn-row mat-btn-row--plain md-hero__actions">
+        @if (Model.RegistrationOpen)
+        {
+            <a class="mat-btn mat-btn--primary mat-btn--lg" href="/Account/Register">@Ui.Icon("rocket")<span>@L["Landing.Register"]</span></a>
+        }
+        <a class="mat-btn mat-btn--secondary mat-btn--lg" href="/Account/Login">@Ui.Icon("login")<span>@L["Account.Login.Title"]</span></a>
+    </div>
+</section>
+
+<section class="md-features" aria-label="@L["Landing.Features"]">
+    <div class="mat-card"><div class="mat-card__body">
+        <h2>@Ui.Icon("server")@L["Landing.Storages.Title"]</h2>
+        <p>@L["Landing.Storages.Text"]</p>
+    </div></div>
+    <div class="mat-card"><div class="mat-card__body">
+        <h2>@Ui.Icon("album")@L["Landing.Albums.Title"]</h2>
+        <p>@L["Landing.Albums.Text"]</p>
+    </div></div>
+    <div class="mat-card"><div class="mat-card__body">
+        <h2>@Ui.Icon("wand")@L["Landing.Import.Title"]</h2>
+        <p>@L["Landing.Import.Text"]</p>
+    </div></div>
+    <div class="mat-card"><div class="mat-card__body">
+        <h2>@Ui.Icon("compass")@L["Landing.Explore.Title"]</h2>
+        <p>@L["Landing.Explore.Text"]</p>
+    </div></div>
+</section>

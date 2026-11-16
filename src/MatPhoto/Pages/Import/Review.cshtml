@@ -1,0 +1,145 @@
+@page "/Import/Review/{token:guid}"
+@model MatPhoto.Pages.Import.ReviewModel
+@{
+    var v = Model.Import;
+    ViewData["Title"] = L["Import.Review"].Value;
+    ViewData["PageSub"] = L["Import.State." + v.State].Value;
+    ViewData["NavKey"] = "imports";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Import.History"].Value, "/Import/History"), (L["Import.Review"].Value, null) };
+    var running = v.State is ImportState.Collecting or ImportState.Analyzing or ImportState.Importing;
+    var percent = v.TotalCount == 0 ? 0 : (int)Math.Round(100.0 * v.DoneCount / v.TotalCount);
+    var groupsTotal = v.Groups.Sum(g => g.Items.Count);
+}
+
+@if (running)
+{
+    <div class="mat-card" data-import-status="@v.Token.ToString("n")">
+        <div class="mat-card__body md-progress">
+            <p class="md-progress__text"><span class="mat-spinner mat-spinner--sm" aria-hidden="true"></span> <span data-progress-text>@L[v.State == ImportState.Importing ? "Import.Importing" : "Import.Analyzing", v.DoneCount, v.TotalCount]</span></p>
+            <div class="mat-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent"><span class="mat-meter__fill" data-progress-bar data-value="@percent"></span></div>
+            <p class="mat-hint">@L["Import.Background"]</p>
+        </div>
+    </div>
+}
+else if (v.State == ImportState.Done)
+{
+    <div class="mat-alert mat-alert--success" role="status">@Ui.Icon("check-circle")<div class="mat-alert__body"><strong>@L["Import.Done", v.ImportedCount]</strong> @L["Import.DoneText", v.SkippedCount, v.FailedCount]</div></div>
+    <div class="md-cards">
+        @foreach (var g in v.Groups.Where(g => g.Include))
+        {
+            var first = g.Items.FirstOrDefault(i => i.HasThumb);
+            <div class="md-card">
+                <span class="md-card__media">@if (first is not null) { <img src="/import/@v.Token.ToString("n")/thumb/@first.Id" alt="" loading="lazy" /> } else { @Ui.Icon("album", "md-card__placeholder") }</span>
+                <span class="md-card__body"><span class="md-card__title">@g.Name</span><span class="md-card__meta">@L["Import.Files", g.Items.Count(i => i.State == ImportItemState.Imported)]</span></span>
+            </div>
+        }
+    </div>
+    <div class="mat-actions">
+        <a class="mat-btn mat-btn--primary" href="/Albums">@Ui.Icon("album")<span>@L["Albums.Title"]</span></a>
+        <a class="mat-btn mat-btn--secondary" href="/Import">@Ui.Icon("import")<span>@L["Import.Again"]</span></a>
+    </div>
+}
+else if (v.State is ImportState.Failed or ImportState.Cancelled)
+{
+    <div class="mat-alert @(v.State == ImportState.Failed ? "mat-alert--danger" : "mat-alert--info")" role="status">@Ui.Icon(v.State == ImportState.Failed ? "alert" : "info")<div class="mat-alert__body"><strong>@L["Import.State." + v.State]</strong> @v.Message</div></div>
+    <div class="mat-actions"><a class="mat-btn mat-btn--primary" href="/Import">@Ui.Icon("import")<span>@L["Import.Again"]</span></a></div>
+}
+else
+{
+    <form class="mat-form" method="post" novalidate>
+        <partial name="_FormSummary" model="ViewData.ModelState" />
+        <div class="mat-alert mat-alert--info" role="note">@Ui.Icon("wand")<div class="mat-alert__body"><strong>@L["Import.Suggested", v.Groups.Count, groupsTotal]</strong> @L["Import.SuggestedText"]</div></div>
+
+        <div class="mat-card">
+            <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("server")@L["Import.Target"]</h2></div>
+            <div class="mat-card__body mat-form">
+                <md-field name="TargetStorageId" kind="radios" label="@L["Import.TargetStorage"]" value="@Model.TargetStorageId" options="Model.Targets" />
+                <md-field name="TargetFolder" label="@L["Import.TargetFolder"]" value="@Model.TargetFolder" maxlength="2000" optional mono hint="@L["Import.TargetFolder.Hint"]" autocomplete="off" />
+                @if (v.Source == ImportSource.Storage)
+                {
+                    <p class="mat-hint">@Ui.Icon(v.MoveFiles ? "folder-open" : "copy") @L[v.MoveFiles ? "Import.WillMove" : "Import.WillCopy", v.SourceName ?? "", v.SourcePath ?? ""]</p>
+                }
+            </div>
+        </div>
+
+        @for (var n = 0; n < v.Groups.Count; n++)
+        {
+            var g = v.Groups[n];
+            var idName = $"Groups[{n}]";
+            var errorKey = $"Group{g.Id}";
+            <section class="mat-card md-group" aria-labelledby="group-@g.Id">
+                <input type="hidden" name="@($"{idName}.Id")" value="@g.Id" />
+                <div class="mat-card__head md-group__head">
+                    <h2 class="mat-card__title" id="group-@g.Id">@Ui.Icon(g.Reason switch { "screenshots" => "screenshot", "nodate" => "calendar", "place" => "map-pin", "folder" => "folder", _ => "album" })<span>@L["Import.Group", n + 1]</span></h2>
+                    <span class="mat-pill mat-pill--plain">@L["Import.Reason." + g.Reason]</span>
+                    <span class="md-group__meta">@AlbumText.Dates(null, g.StartDate, g.EndDate)@(g.Place is null ? "" : " · " + g.Place) · @L["Import.Files", g.Items.Count]</span>
+                </div>
+                <div class="mat-card__body mat-form">
+                    <div class="md-strip">
+                        @foreach (var i in g.Items.Take(14))
+                        {
+                            <span class="md-strip__item" title="@i.FileName">
+                                @if (i.HasThumb)
+                                {
+                                    <img src="/import/@v.Token.ToString("n")/thumb/@i.Id" alt="" loading="lazy" decoding="async" />
+                                }
+                                else
+                                {
+                                    @Ui.Icon(i.Type == MediaType.Video ? "video" : "image")
+                                }
+                                @if (i.Type == MediaType.Video) { <span class="md-strip__badge">@Ui.Icon("play")</span> }
+                            </span>
+                        }
+                        @if (g.Items.Count > 14)
+                        {
+                            <span class="md-strip__more">+@(g.Items.Count - 14)</span>
+                        }
+                    </div>
+                    <div class="mat-form__grid">
+                        <div class="mat-field">
+                            <label class="mat-label" for="group-name-@g.Id">@L["Import.AlbumName"]</label>
+                            <input class="mat-input mat-mono" id="group-name-@g.Id" name="@($"{idName}.Name")" value="@g.Name" maxlength="120" autocomplete="off" />
+                            <span class="mat-hint">@L["Import.AlbumName.Hint", DateTime.Today.ToString(Model.DateFormat, System.Globalization.CultureInfo.InvariantCulture)]</span>
+                            @if (ViewData.ModelState.TryGetValue(errorKey, out var entry) && entry.Errors.Count > 0)
+                            {
+                                <span class="mat-error">@entry.Errors[0].ErrorMessage</span>
+                            }
+                        </div>
+                        <md-field name="@($"{idName}.Album")" id="@($"group-album-{g.Id}")" kind="select" label="@L["Import.Into"]" value="@(g.ExistingAlbumId?.ToString() ?? "")" options="Model.AlbumOptions()" />
+                    </div>
+                    <md-field name="@($"{idName}.Include")" id="@($"group-include-{g.Id}")" kind="switch" label="@L["Import.Include"]" value="@g.Include.ToString()" />
+                </div>
+            </section>
+        }
+
+        @if (v.Duplicates.Count > 0)
+        {
+            <details class="mat-card md-dupes-import">
+                <summary class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("duplicate")@L["Import.Duplicates", v.Duplicates.Count]</h2></summary>
+                <div class="mat-card__body">
+                    <p class="mat-hint">@L["Import.Duplicates.Hint"]</p>
+                    <div class="md-strip">
+                        @foreach (var i in v.Duplicates.Take(40))
+                        {
+                            <span class="md-strip__item" title="@i.FileName">@if (i.HasThumb) { <img src="/import/@v.Token.ToString("n")/thumb/@i.Id" alt="" loading="lazy" /> } else { @Ui.Icon("image") }</span>
+                        }
+                    </div>
+                </div>
+            </details>
+        }
+
+        @if (v.Unreadable.Count > 0)
+        {
+            <div class="mat-alert mat-alert--warning" role="note">@Ui.Icon("alert")<div class="mat-alert__body"><strong>@L["Import.Unreadable", v.Unreadable.Count]</strong>
+                <ul class="mat-alert__list">@foreach (var i in v.Unreadable.Take(10)) { <li>@i.FileName: @i.Error</li> }</ul></div></div>
+        }
+
+        <md-buttons save="@L["Import.Run"]" save-icon="import" back="/Import/History" delete-handler="Cancel" delete-label="@L["Import.Cancel"]" delete-confirm="@L["Import.CancelConfirm"]">
+            <button type="submit" class="mat-btn mat-btn--secondary md-btn-collapse" asp-page-handler="Save" aria-label="@L["Import.SaveForLater"]" data-tip="@L["Import.SaveForLater"]">@Ui.Icon("save")<span>@L["Import.SaveForLater"]</span></button>
+        </md-buttons>
+    </form>
+}
+
+@section Scripts {
+    <script type="module" src="~/js/import.js" asp-append-version="true"></script>
+}

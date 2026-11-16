@@ -1,0 +1,55 @@
+@page "/Import/History"
+@model MatPhoto.Pages.Import.HistoryModel
+@{
+    ViewData["Title"] = L["Import.History"].Value;
+    ViewData["PageSub"] = L["Import.History.Sub"].Value;
+    ViewData["NavKey"] = "imports";
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("import", L[first ? "Import.History.Empty" : "Import.History.NoMatch"].Value, L[first ? "Import.History.EmptyText" : "Lists.ChangeTools"].Value, first, Model.CanImport ? "/Import" : null, L["Import.Title"].Value, Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <md-table caption="@L["Import.History"]">
+            <thead>
+                <tr>
+                    <th scope="col">@L["Import.Col.Date"]</th>
+                    <th scope="col">@L["Import.Col.Source"]</th>
+                    <th scope="col">@L["Common.Status"]</th>
+                    <th scope="col" class="mat-num">@L["Import.Col.Imported"]</th>
+                    <th scope="col" class="mat-num mat-hide-sm">@L["Import.Col.Skipped"]</th>
+                    <th scope="col"><span class="mat-sr-only">@L["Common.Actions"]</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var r in Model.Items)
+                {
+                    var tone = r.State switch { ImportState.Done => "mat-pill--ok", ImportState.Failed => "mat-pill--error", ImportState.Review => "mat-pill--info", ImportState.Cancelled => "mat-pill--plain", _ => "mat-pill--busy" };
+                    <tr>
+                        <td data-label="@L["Import.Col.Date"]" class="mat-mono mat-table__primary"><a href="/Import/Review/@r.Token.ToString("n")">@Dates.Stamp(r.CreateDate, Model.Zone)</a></td>
+                        <td data-label="@L["Import.Col.Source"]">@(r.Source == ImportSource.Upload ? L["Import.Source.Upload"].Value : r.SourceName)</td>
+                        <td data-label="@L["Common.Status"]"><span class="mat-pill @tone">@L["Import.State." + r.State]</span></td>
+                        <td data-label="@L["Import.Col.Imported"]" class="mat-num mat-mono mat-table__keep-label">@r.ImportedCount / @r.TotalCount</td>
+                        <td data-label="@L["Import.Col.Skipped"]" class="mat-num mat-mono mat-hide-sm">@r.SkippedCount</td>
+                        <td class="mat-table__cell-actions"><div class="mat-table__actions"><a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Import/Review/@r.Token.ToString("n")" aria-label="@L["Import.Open"]" data-tip="@L["Import.Open"]">@Ui.Icon("chevron-right")</a></div></td>
+                    </tr>
+                }
+            </tbody>
+        </md-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+
+    @if (Model.CanImport)
+    {
+        <div class="mat-actions">
+            <a class="mat-btn mat-btn--primary" href="/Import">@Ui.Icon("import")<span>@L["Import.New"]</span></a>
+        </div>
+    }
+</div>

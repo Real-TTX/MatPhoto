@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Makes the sample photos of the local stack (./sample-data, mounted as /storage/sample): dotnet run with the project tools/SampleData -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" Version="15.1.0" />
+  </ItemGroup>
+
+</Project>

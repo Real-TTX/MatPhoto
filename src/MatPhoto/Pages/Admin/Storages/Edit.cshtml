@@ -1,0 +1,157 @@
+@page "/Admin/Storages/Edit"
+@model MatPhoto.Pages.Admin.Storages.EditModel
+@using MatPhoto.Services.Storages
+@{
+    ViewData["Title"] = Model.Title;
+    ViewData["Tab"] = "general";
+    ViewData["Width"] = "narrow";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Admin.Title"].Value, null), (L["Storages.Title"].Value, "/Admin/Storages"), (Model.IsNew ? L["Common.New"].Value : Model.Title, null) };
+    var secretHint = Model.HasPassword ? L["Storages.Field.Password.Stored"].Value : L["Storages.Field.Password.Hint"].Value;
+    var status = Model.Status;
+}
+<partial name="_StorageTabs" model="Model.Id" />
+
+@* the address of the form names the page itself: after "Test connection" the address of the page carries ?handler=Test, and Save must not go there *@
+<form class="mat-form" method="post" asp-page="/Admin/Storages/Edit" asp-route-id="@Model.Id" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+
+    @if (!Model.IsNew)
+    {
+        <div class="mat-card">
+            <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("activity")@L["Storages.Status"]</h2></div>
+            <div class="mat-card__body">
+                <dl class="mat-kv">
+                    <dt>@L["Common.Status"]</dt>
+                    <dd>
+                        @if (!Model.IsActive)
+                        {
+                            <span class="mat-pill mat-pill--plain">@L["Storages.Inactive"]</span>
+                        }
+                        else if (status is null)
+                        {
+                            <span class="mat-pill mat-pill--plain">@L["Storages.NotChecked"]</span>
+                        }
+                        else if (status.Reachable)
+                        {
+                            <span class="mat-pill mat-pill--ok">@L["Storages.Reachable"]</span>
+                        }
+                        else
+                        {
+                            <span class="mat-pill mat-pill--error">@L["Storages.Unreachable"]</span> <span class="md-muted">@status.Message</span>
+                        }
+                    </dd>
+                    @if (status is not null)
+                    {
+                        <dt>@L["Storages.CheckedLast"]</dt>
+                        <dd class="mat-mono">@Dates.Stamp(status.CheckedUtc, Model.Zone)</dd>
+                    }
+                    @if (Model.IsLibrary)
+                    {
+                        <dt>@L["Storages.LastScan"]</dt>
+                        <dd>@(Model.LastScanDate is { } scanned ? Dates.Stamp(scanned, Model.Zone) : L["Common.Never"].Value)@if (!string.IsNullOrEmpty(Model.LastScanResult)) { <small class="md-muted md-block-line">@Model.LastScanResult</small> }</dd>
+                    }
+                    @if (status?.Space is { } space)
+                    {
+                        <dt>@L["Storages.Space"]</dt>
+                        <dd>
+                            <div class="md-loc-space">
+                                <div class="mat-meter mat-meter--sm"><div class="mat-meter__fill" data-value="@Math.Round(space.Share * 100)" data-tone="@(space.Share > 0.9 ? "error" : space.Share > 0.75 ? "warn" : "ok")"></div></div>
+                                <span>@L["Storages.SpaceFree", Ui.Bytes(space.Free), Ui.Bytes(space.Total)]</span>
+                            </div>
+                        </dd>
+                    }
+                </dl>
+            </div>
+        </div>
+    }
+
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("plug")@L["Storages.Connection"]</h2></div>
+        <div class="mat-card__body mat-form">
+            <md-field name="Name" label="@L["Common.Name"]" required value="@Model.Name" maxlength="120" msg-required="@L["Common.NameRequired"]" hint="@L["Storages.Field.Name.Hint"]" />
+            <md-field name="Kind" kind="radios" label="@L["Storages.Col.Kind"]" value="@Model.Kind.ToString()" options="Model.Kinds" />
+
+            @* a local folder: inside the storage root of the container *@
+            <md-field name="RootPath" kind="text" label="@L["Storages.Field.Folder.Local"]" value="@(Model.Kind == StorageKind.Local ? Model.RootPath : string.Empty)" maxlength="500" mono show-if="Kind" show-value="Local"
+                      hint="@L["Storages.Field.Folder.LocalHint", Model.StorageRoot]" autocomplete="off" />
+
+            @* WebDAV: the address of the share *@
+            <md-field name="Url" kind="url" label="@L["Storages.Field.Url"]" value="@Model.WebDavUrl" maxlength="500" mono show-if="Kind" show-value="WebDav"
+                      placeholder="https://cloud.example.com/remote.php/dav/files/anna/" hint="@L["Storages.Field.Url.Hint"]" autocomplete="off" />
+
+            @* SMB, SFTP, FTP: a server *@
+            <div class="mat-form__grid md-loc-server" data-show-if="Kind" data-show-value="Smb,Sftp,Ftp">
+                <md-field name="Host" label="@L["Storages.Field.Host"]" value="@Model.Host" maxlength="255" mono placeholder="nas.local" autocomplete="off" />
+                <md-field name="Port" kind="number" label="@L["Storages.Field.Port"]" value="@Model.Port" min="1" max="65535" optional hint="@L["Storages.Field.Port.Hint"]" inputmode="numeric" />
+            </div>
+            <md-field name="Share" label="@L["Storages.Field.Share"]" value="@Model.Share" maxlength="255" optional mono show-if="Kind" show-value="Smb" hint="@L["Storages.Field.Share.Hint"]" autocomplete="off" />
+            <md-field name="RootPath" id="RootPathRemote" label="@L["Storages.Field.Folder.Remote"]" value="@(Model.Kind == StorageKind.Local ? string.Empty : Model.RootPath)" maxlength="500" optional mono show-if="Kind" show-value="Smb,Sftp,Ftp"
+                      hint="@L["Storages.Field.Folder.RemoteHint"]" placeholder="/" autocomplete="off" />
+
+            @* the account (all but local) *@
+            <div class="mat-form__grid" data-show-if="Kind" data-show-value="Smb,Sftp,Ftp,WebDav">
+                <md-field name="Username" label="@L["Storages.Field.User"]" value="@Model.Username" maxlength="255" optional autocomplete="off" />
+                <md-field name="Domain" label="@L["Storages.Field.Domain"]" value="@Model.Domain" maxlength="255" optional show-if="Kind" show-value="Smb" autocomplete="off" />
+            </div>
+            <div data-show-if="Kind" data-show-value="Sftp">
+                <md-field name="UseKey" kind="radios" label="@L["Storages.Field.Auth"]" value="@(Model.UseKey ? "true" : "false")" options="Model.AuthChoices" />
+            </div>
+            <div data-show-if="Kind" data-show-value="Sftp">
+                <md-field name="PrivateKey" kind="textarea" label="@L["Storages.Field.Key"]" rows="5" mono show-if="UseKey" show-value="true" maxlength="12000"
+                          hint="@(Model.HasPrivateKey ? L["Storages.Field.Key.Stored"].Value : L["Storages.Field.Key.Hint"].Value)" placeholder="-----BEGIN OPENSSH PRIVATE KEY-----" />
+            </div>
+            <div data-show-if="Kind" data-show-value="Smb,Sftp,Ftp,WebDav">
+                <md-field name="Password" kind="password" label="@L["Storages.Field.Password"]" optional autocomplete="new-password" maxlength="1000" hint="@secretHint" />
+                @if (Model.HasPassword)
+                {
+                    <md-field name="ClearPassword" kind="check" label="@L["Storages.Field.ClearPassword"]" value="@Model.ClearPassword.ToString()" />
+                }
+            </div>
+            <md-field name="UseTls" kind="switch" label="@L["Storages.Field.Tls"]" value="@Model.UseTls.ToString()" show-if="Kind" show-value="Ftp" />
+            <md-field name="AcceptAnyCertificate" kind="switch" label="@L["Storages.Field.AnyCertificate"]" value="@Model.AcceptAnyCertificate.ToString()" show-if="Kind" show-value="Ftp,WebDav" />
+        </div>
+    </div>
+
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("image")@L["Storages.Library"]</h2></div>
+        <div class="mat-card__body mat-form">
+            <md-field name="IsLibrary" kind="switch" label="@L["Storages.Field.Library"]" value="@Model.IsLibrary.ToString()" hint="@L["Storages.Field.Library.Hint"]" />
+            <md-field name="ScanIntervalMinutes" kind="number" label="@L["Storages.Field.Interval"]" value="@Model.ScanIntervalMinutes" min="0" max="10080" inputmode="numeric" show-if="IsLibrary" show-value="true" hint="@L["Storages.Field.Interval.Hint"]" />
+            <md-field name="ExcludeFolders" label="@L["Storages.Field.Exclude"]" value="@Model.ExcludeFolders" maxlength="1000" optional mono show-if="IsLibrary" show-value="true" hint="@L["Storages.Field.Exclude.Hint"]" placeholder="Backup; tmp" autocomplete="off" />
+        </div>
+    </div>
+
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("settings")@L["Storages.Use"]</h2></div>
+        <div class="mat-card__body mat-form">
+            <md-field name="IsActive" kind="switch" label="@L["Storages.Field.Active"]" value="@Model.IsActive.ToString()" hint="@L["Storages.Field.Active.Hint"]" />
+            <md-field name="IsReadOnly" kind="switch" label="@L["Storages.Field.ReadOnly"]" value="@Model.IsReadOnly.ToString()" hint="@L["Storages.Field.ReadOnly.Hint"]" />
+            <md-field name="Note" kind="textarea" label="@L["Storages.Field.Note"]" value="@Model.Note" rows="3" maxlength="1000" optional />
+        </div>
+    </div>
+
+    @if (Model.Tested is { } tested)
+    {
+        if (tested.Reachable)
+        {
+            <div class="mat-alert mat-alert--success" role="status">@Ui.Icon("check-circle")<div class="mat-alert__body"><strong>@L["Storages.Test.Ok"]</strong>@if (tested.Space is { } s) { <span> @L["Storages.SpaceFree", Ui.Bytes(s.Free), Ui.Bytes(s.Total)]</span> }</div></div>
+        }
+        else
+        {
+            <div class="mat-alert mat-alert--danger" role="alert">@Ui.Icon("x-circle")<div class="mat-alert__body"><strong>@L["Storages.Test.Failed"]</strong> <span>@tested.Message</span></div></div>
+        }
+    }
+    else if (Model.TestError is { } testError)
+    {
+        <div class="mat-alert mat-alert--danger" role="alert">@Ui.Icon("x-circle")<div class="mat-alert__body"><strong>@L["Storages.Test.Failed"]</strong> <span>@testError</span></div></div>
+    }
+
+    <md-buttons save="@L[Model.IsNew ? "Storages.Create" : "Common.Save"]" back="/Admin/Storages" delete-handler="@(Model.IsNew ? null : "Delete")" delete-label="@L["Storages.Delete"]"
+                delete-confirm="@L["Storages.DeleteConfirm", Model.Title]">
+        <button type="submit" class="mat-btn mat-btn--secondary md-btn-collapse" formaction="@Model.HandlerUrl("Test")" formnovalidate aria-label="@L["Storages.Test"]" data-tip="@L["Storages.Test"]">@Ui.Icon("plug")<span>@L["Storages.Test"]</span></button>
+        @if (!Model.IsNew && Model.IsLibrary && Model.IsActive)
+        {
+            <button type="submit" class="mat-btn mat-btn--secondary md-btn-collapse" formaction="@Model.HandlerUrl("Scan")" formnovalidate aria-label="@L["Scan.Now"]" data-tip="@L["Scan.Now"]">@Ui.Icon("refresh")<span>@L["Scan.Now"]</span></button>
+        }
+    </md-buttons>
+</form>

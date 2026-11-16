@@ -1,0 +1,23 @@
+@model IReadOnlyList<ExploreCard>
+@* the cards of the automatic albums of Explore: the cover (the newest photo of the album), the name, how many *@
+<div class="md-cards">
+    @foreach (var c in Model)
+    {
+        <a class="md-card" href="/Explore/View?scope=@Uri.EscapeDataString(c.Scope)">
+            <span class="md-card__media">
+                @if (c.CoverId is { } cover && c.CoverHash is { Length: >= 12 } hash)
+                {
+                    <img src="/media/@cover/thumb?v=@hash[..12]" alt="" loading="lazy" decoding="async" />
+                }
+                else
+                {
+                    @Ui.Icon(c.Icon, "md-card__placeholder")
+                }
+            </span>
+            <span class="md-card__body">
+                <span class="md-card__title">@Ui.Icon(c.Icon)<span>@c.Title</span></span>
+                <span class="md-card__meta">@(c.Subtitle is null ? string.Empty : c.Subtitle + " · ")@L["Explore.Count", c.Count.ToString("N0")]</span>
+            </span>
+        </a>
+    }
+</div>

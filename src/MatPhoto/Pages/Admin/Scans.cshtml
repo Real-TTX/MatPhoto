@@ -1,0 +1,85 @@
+@page "/Admin/Scans"
+@model MatPhoto.Pages.Admin.ScansModel
+@{
+    ViewData["Title"] = L["Scans.Title"].Value;
+    ViewData["PageSub"] = L["Scans.Sub"].Value;
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Admin.Title"].Value, null), (L["Scans.Title"].Value, null) };
+}
+
+<div class="mat-list">
+    <div class="mat-toolbar" role="toolbar" aria-label="@L["Scans.Title"]">
+        <span class="mat-toolbar__info">@L["Scans.Tools", Model.Items.Count]</span>
+        <span class="mat-toolbar__spacer"></span>
+        <span class="mat-toolbar__info">@(Model.Video ? L["Scans.Ffmpeg.Yes"] : L["Scans.Ffmpeg.No"])</span>
+    </div>
+
+    @if (Model.Items.Count == 0)
+    {
+        <partial name="_Empty" model="@(new EmptyStateModel("server", L["Scans.Empty"].Value, L["Scans.EmptyText"].Value, true, "/Admin/Storages/Edit", L["Storages.New"].Value))" />
+    }
+    else
+    {
+        <md-table caption="@L["Scans.Title"]">
+            <thead>
+                <tr>
+                    <th scope="col">@L["Storages.One"]</th>
+                    <th scope="col">@L["Common.Status"]</th>
+                    <th scope="col" class="mat-num">@L["Scans.Files"]</th>
+                    <th scope="col" class="mat-hide-sm">@L["Scans.Progress"]</th>
+                    <th scope="col" class="mat-hide-md">@L["Storages.LastScan"]</th>
+                    <th scope="col"><span class="mat-sr-only">@L["Common.Actions"]</span></th>
+                </tr>
+            </thead>
+            <tbody data-scans>
+                @foreach (var s in Model.Items)
+                {
+                    var p = s.Progress;
+                    <tr data-scan="@s.Id">
+                        <td data-label="@L["Storages.One"]" class="mat-table__primary"><a href="/Admin/Storages/Edit?id=@s.Id">@s.Name</a><small class="md-muted md-block-line">@L["Scans.Every", s.Interval]</small></td>
+                        <td data-label="@L["Common.Status"]" data-scan-phase>
+                            @if (p is null)
+                            {
+                                <span class="mat-pill mat-pill--plain">@L["Scan.Phase.idle"]</span>
+                            }
+                            else
+                            {
+                                <span class="mat-pill @(p.Running ? "mat-pill--busy" : p.Phase == "failed" ? "mat-pill--error" : p.Phase == "queued" ? "mat-pill--info" : "mat-pill--ok")">@L["Scan.Phase." + p.Phase]</span>
+                            }
+                        </td>
+                        <td data-label="@L["Scans.Files"]" class="mat-num mat-mono" data-scan-files>@(p?.Files.ToString("N0") ?? s.Media.ToString("N0"))</td>
+                        <td data-label="@L["Scans.Progress"]" class="mat-hide-sm" data-scan-progress>
+                            @if (p is { Running: true, ToIndex: > 0 })
+                            {
+                                var percent = (int)Math.Round(100.0 * (p.Indexed + p.Failed) / p.ToIndex);
+                                <div class="mat-meter mat-meter--sm"><span class="mat-meter__fill" data-value="@percent"></span></div>
+                                <small class="md-muted">@L["Scans.Indexed", p.Indexed, p.ToIndex]</small>
+                            }
+                            else if (p?.Result is { } r)
+                            {
+                                <small>@r</small>
+                            }
+                        </td>
+                        <td data-label="@L["Storages.LastScan"]" class="mat-mono mat-hide-md">@(s.LastScan is { } d ? Dates.Stamp(d, Model.Zone) : L["Common.Never"].Value)</td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                <form method="post" asp-page-handler="Scan" asp-route-id="@s.Id">
+                                    <button type="submit" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" aria-label="@L["Scan.Now"]" data-tip="@L["Scan.Now"]">@Ui.Icon("refresh")</button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </md-table>
+    }
+
+    <div class="mat-actions">
+        <form method="post" asp-page-handler="ScanAll">
+            <button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("refresh")<span>@L["Scans.All"]</span></button>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script src="~/js/scans.js" asp-append-version="true"></script>
+}

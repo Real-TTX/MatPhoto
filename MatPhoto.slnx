@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/MatPhoto/MatPhoto.csproj" />
+  </Folder>
+  <Folder Name="/tools/">
+    <Project Path="tools/SampleData/SampleData.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/MatPhoto.Tests/MatPhoto.Tests.csproj" />
+  </Folder>
+</Solution>

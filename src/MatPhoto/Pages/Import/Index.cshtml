@@ -1,0 +1,75 @@
+@page "/Import"
+@model MatPhoto.Pages.Import.IndexModel
+@{
+    ViewData["Title"] = L["Import.Title"].Value;
+    ViewData["PageSub"] = L["Import.Sub"].Value;
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Import.Title"].Value, null) };
+}
+
+<div class="mat-cols">
+    <div class="mat-col-12 mat-col-lg-6">
+        <section class="mat-card md-import" data-import-upload data-max="@Model.MaxUploadBytes">
+            <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("upload")@L["Import.FromDevice"]</h2></div>
+            <div class="mat-card__body">
+                <div class="md-drop" data-drop tabindex="0" role="group" aria-label="@L["Import.Drop"]">
+                    @Ui.Icon("image", "md-drop__icon")
+                    <p class="md-drop__text">@L["Import.Drop"]</p>
+                    <div class="mat-btn-row mat-btn-row--plain md-drop__buttons">
+                        <label class="mat-btn mat-btn--primary">@Ui.Icon("image")<span>@L["Import.ChooseFiles"]</span><input type="file" class="mat-sr-only" data-pick-files multiple accept="@Model.Accept" /></label>
+                        <label class="mat-btn mat-btn--secondary">@Ui.Icon("folder")<span>@L["Import.ChooseFolder"]</span><input type="file" class="mat-sr-only" data-pick-folder webkitdirectory multiple /></label>
+                    </div>
+                    <p class="mat-hint">@L["Import.DropHint"]</p>
+                </div>
+                <div class="md-progress" data-progress hidden>
+                    <p class="md-progress__text" data-progress-text aria-live="polite"></p>
+                    <div class="mat-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span class="mat-meter__fill" data-progress-bar></span></div>
+                    <ul class="md-progress__errors" data-progress-errors></ul>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="mat-col-12 mat-col-lg-6">
+        <form class="mat-card mat-form" method="post" asp-page-handler="Storage" novalidate data-import-storage>
+            <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("server")@L["Import.FromStorage"]</h2></div>
+            <div class="mat-card__body mat-form">
+                <partial name="_FormSummary" model="ViewData.ModelState" />
+                @if (Model.Sources.Count == 0)
+                {
+                    <p class="md-muted">@L["Import.NoSources"]</p>
+                }
+                else
+                {
+                    <p class="mat-hint">@L["Import.FromStorage.Hint"]</p>
+                    <md-field name="SourceStorageId" kind="radios" label="@L["Import.Source"]" value="@Model.SourceStorageId" options="Model.Sources" />
+                    <md-field name="SourcePath" label="@L["Import.Folder"]" value="@Model.SourcePath" maxlength="2000" optional mono placeholder="Camera Uploads" hint="@L["Import.Folder.Hint"]" autocomplete="off" />
+                    <div class="md-folders" data-folders aria-live="polite"></div>
+                    <div data-movable="@Model.MovableSources">
+                        <md-field name="MoveFiles" kind="switch" label="@L["Import.Move"]" value="@Model.MoveFiles.ToString()" hint="@L["Import.Move.Hint"]" />
+                    </div>
+                }
+            </div>
+            @if (Model.Sources.Count > 0)
+            {
+                <div class="mat-card__foot">
+                    <div class="mat-btn-row mat-btn-row--plain">
+                        <button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("wand")<span>@L["Import.Analyze"]</span></button>
+                    </div>
+                </div>
+            }
+        </form>
+    </div>
+</div>
+
+<section class="md-section" aria-labelledby="import-how">
+    <h2 class="md-section__title" id="import-how">@Ui.Icon("wand")@L["Import.How"]</h2>
+    <ol class="md-steps">
+        <li>@L["Import.How.1"]</li>
+        <li>@L["Import.How.2"]</li>
+        <li>@L["Import.How.3"]</li>
+    </ol>
+</section>
+
+@section Scripts {
+    <script type="module" src="~/js/import.js" asp-append-version="true"></script>
+}

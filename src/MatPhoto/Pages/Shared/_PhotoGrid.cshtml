@@ -1,0 +1,25 @@
+@model MatPhoto.Pages.GridModel
+@*
+    The photo grid (the special UI of the app, built on the toolkit): months with their days, the photos in justified rows like a photo book, loaded month by month
+    while scrolling (wwwroot/js/photos.js), the selection with its bar, and the viewer. Everything the grid shows comes from /live/timeline and /live/items.
+*@
+<div class="md-grid" data-photo-grid data-scope="@Model.Scope" data-list="@Model.ListId" data-album="@Model.AlbumId" data-days="@(Model.Days ? "1" : "0")">
+    <div class="md-selbar mat-bulk" data-selbar role="toolbar" aria-label="@L["Grid.Selection"]" hidden>
+        <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon" data-sel-clear aria-label="@L["Grid.ClearSelection"]" data-tip="@L["Grid.ClearSelection"]">@Ui.Icon("x")</button>
+        <span class="mat-bulk__count" data-sel-count aria-live="polite"></span>
+        <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon" data-sel-action="favorite" aria-label="@L["Grid.Favorite"]" data-tip="@L["Grid.Favorite"]">@Ui.Icon("heart")</button>
+        <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon" data-sel-action="list" aria-label="@L["Grid.AddToList"]" data-tip="@L["Grid.AddToList"]">@Ui.Icon("list-plus")</button>
+        @if (Model.ListId is not null)
+        {
+            <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon" data-sel-action="unlist" aria-label="@L["Grid.RemoveFromList"]" data-tip="@L["Grid.RemoveFromList"]">@Ui.Icon("minus")</button>
+        }
+        <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon md-selbar__danger" data-sel-action="trash" aria-label="@L["Grid.Trash"]" data-tip="@L["Grid.Trash"]">@Ui.Icon("trash")</button>
+    </div>
+
+    <p class="md-grid__status" data-grid-status aria-live="polite"><span class="mat-spinner mat-spinner--sm" aria-hidden="true"></span><span>@L["Grid.Loading"]</span></p>
+    <div class="md-grid__canvas" data-grid-canvas role="list" aria-label="@Model.Label"></div>
+    <div data-grid-empty hidden>
+        <partial name="_Empty" model="@(new EmptyStateModel(Model.EmptyIcon, Model.EmptyTitle, Model.EmptyText, true, Model.EmptyAction, Model.EmptyActionLabel, null))" />
+    </div>
+    <nav class="md-scrubber" data-grid-scrubber aria-label="@L["Grid.Years"]" hidden></nav>
+</div>

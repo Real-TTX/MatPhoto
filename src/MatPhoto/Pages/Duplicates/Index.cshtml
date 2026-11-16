@@ -1,0 +1,88 @@
+@page "/Duplicates"
+@model MatPhoto.Pages.Duplicates.IndexModel
+@{
+    ViewData["Title"] = L["Duplicates.Title"].Value;
+    ViewData["PageSub"] = L["Duplicates.Sub", Model.Report.ExactGroups, Model.Report.SimilarGroups].Value;
+    ViewData["NavKey"] = "duplicates";
+    ViewData["Width"] = "wide";
+}
+
+<div class="mat-toolbar" role="toolbar" aria-label="@L["Duplicates.Title"]">
+    <div class="mat-seg" role="group" aria-label="@L["Duplicates.Kind"]">
+        @foreach (var kind in MatPhoto.Pages.Duplicates.IndexModel.Kinds)
+        {
+            <a class="mat-seg__btn" href="/Duplicates@(kind == "all" ? "" : "?kind=" + kind)" aria-pressed="@(Model.Kind == kind ? "true" : "false")">@L["Duplicates.Kind." + kind]</a>
+        }
+    </div>
+    <span class="mat-toolbar__spacer"></span>
+    @if (Model.Report.Wasted > 0)
+    {
+        <span class="mat-toolbar__info">@L["Duplicates.Wasted", Ui.Bytes(Model.Report.Wasted)]</span>
+    }
+</div>
+
+@if (Model.Report.Groups.Count == 0)
+{
+    <div class="mat-empty mat-empty--framed">
+        <span class="mat-empty__icon">@Ui.Icon("check-circle")</span>
+        <div class="mat-empty__title">@L["Duplicates.None"]</div>
+        <p>@L["Duplicates.NoneText"]</p>
+    </div>
+}
+else
+{
+    <div class="md-dupes">
+        @foreach (var g in Model.Report.Groups)
+        {
+            <form class="mat-card md-dupe" method="post" asp-route-kind="@Model.Kind">
+                <div class="mat-card__head">
+                    <h2 class="mat-card__title">@Ui.Icon(g.Exact ? "copy" : "duplicate")@L[g.Exact ? "Duplicates.Exact" : "Duplicates.Similar"]</h2>
+                    <span class="mat-pill @(g.Exact ? "mat-pill--warn" : "mat-pill--info")">@L["Duplicates.Count", g.Items.Count]</span>
+                </div>
+                <div class="mat-card__body">
+                    <fieldset class="md-dupe__items">
+                        <legend class="mat-sr-only">@L["Duplicates.Keep"]</legend>
+                        @foreach (var i in g.Items)
+                        {
+                            var id = $"keep-{g.Key}-{i.Id}";
+                            <input type="hidden" name="Ids" value="@i.Id" />
+                            <label class="md-dupe__item" for="@id">
+                                <span class="md-dupe__media">
+                                    @if (i.HasThumb && i.Hash.Length >= 12)
+                                    {
+                                        <img src="/media/@i.Id/thumb?v=@i.Hash[..12]" alt="" loading="lazy" decoding="async" />
+                                    }
+                                    else
+                                    {
+                                        @Ui.Icon("image", "md-card__placeholder")
+                                    }
+                                </span>
+                                <span class="md-dupe__choice mat-check">
+                                    <input type="radio" id="@id" name="Keep" value="@i.Id" checked="@i.Keep" />
+                                    <span>@L[i.Keep ? "Duplicates.KeepSuggested" : "Duplicates.KeepThis"]</span>
+                                </span>
+                                <span class="md-dupe__facts">
+                                    <strong>@i.FileName</strong>
+                                    <small>@(i.Width > 0 ? $"{i.Width} × {i.Height} · " : string.Empty)@Ui.Bytes(i.Size) · @i.SortDate.ToString("d", System.Globalization.CultureInfo.CurrentUICulture)</small>
+                                    <a class="md-dupe__album" href="/Albums/View/@i.AlbumId">@Ui.Icon("album")<span>@i.AlbumName</span></a>
+                                    <small class="mat-mono md-dupe__path">@i.StorageName / @i.Path</small>
+                                    @if (!i.CanEdit)
+                                    {
+                                        <small class="md-muted">@Ui.Icon("lock") @L["Duplicates.ReadOnly"]</small>
+                                    }
+                                </span>
+                            </label>
+                        }
+                    </fieldset>
+                </div>
+                <div class="mat-card__foot">
+                    <div class="mat-btn-row mat-btn-row--plain">
+                        <button type="submit" class="mat-btn mat-btn--secondary" asp-page-handler="Dismiss" formnovalidate>@Ui.Icon("x-circle")<span>@L["Duplicates.NotDuplicates"]</span></button>
+                        <span class="mat-btn-row__spacer"></span>
+                        <button type="submit" class="mat-btn mat-btn--danger" asp-page-handler="Resolve" data-confirm="@L["Duplicates.ResolveConfirm"]" data-confirm-ok="@L["Duplicates.Resolve"]">@Ui.Icon("trash")<span>@L["Duplicates.Resolve"]</span></button>
+                    </div>
+                </div>
+            </form>
+        }
+    </div>
+}
