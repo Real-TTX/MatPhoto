@@ -93,7 +93,10 @@ Administrators manage storages but see their photos only with a role like anybod
 **Library**: a scan lists, adds new files at once (`ThumbState.Pending`, resumable), then indexes new/changed/pending files newest first (3 at a time); a new path with
 the hash and size of a vanished record takes that record (favourites and lists survive moves). Live Photos: photo + video ≤ 5 s of the same name. Folders a NAS keeps
 (`@eaDir`, `#recycle` …), hidden folders, `.matphoto-trash` and the cache folder are never scanned. A change of the cache place or the sizes sets every record to
-`Pending` (they stay visible) and the next scans make the thumbnails again.
+`Pending` (they stay visible) and the next scans make the thumbnails again. **Import suggestion** (`ImportService.Suggest`): a folder a person named is ONE album
+whatever the camera clock says (`AlbumNames.AlbumFolderOf`: day folders like `20100127` belong to their parent; device folders `DCIM`, `100CANON`, `WhatsApp Images`,
+`Fotos`, years name no album); a year in the name becomes the first date of that year, else the name stays (`2008 Familie Olleck`). Only the rest goes by time and
+place. Files of the import's source that are in the library are no duplicates of the library.
 
 **UI (MatDesign rules)**: CRUD = list page (toolbar above, table/cards, pager under it, actions left below) + separate edit page (Save, Back, space, Delete); a
 storage has **tabs** (General, Access), System has tabs (General, Thumbnails, Import). The grid and the viewer are the special UI of the app (the viewer on black),

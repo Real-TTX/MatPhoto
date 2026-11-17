@@ -145,15 +145,16 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
             }
         }
 
+        var own = session.Source == ImportSource.Storage ? items.Select(i => i.SourcePath).ToHashSet(StringComparer.Ordinal) : [];
+        bool InSource(long storageId, string path) => storageId == session.SourceStorageId && own.Contains(path);
         var first = new Dictionary<(string, long), long>();
         foreach (var item in items.Where(i => i.State == ImportItemState.Ready))
         {
             var key = (item.ContentHash, item.Size);
 
-            // a file of an inbox inside a library is in the library already – as itself: that is no duplicate (sorting the inbox into albums moves it)
-            var other = known.TryGetValue(key, out var copies)
-                ? copies.FirstOrDefault(c => !(session.Source == ImportSource.Storage && c.StorageId == session.SourceStorageId && c.Path == item.SourcePath))
-                : default;
+            // a file of an inbox inside a library is in the library already – as itself and as the other files of this import: those are no duplicates of the
+            // library (sorting the inbox into albums moves them); twice in this import is found below
+            var other = known.TryGetValue(key, out var copies) ? copies.FirstOrDefault(c => !InSource(c.StorageId, c.Path)) : default;
             item.DuplicateOfMediaId = other.Id > 0 ? other.Id : null;
             item.DuplicateOfItemId = item.DuplicateOfMediaId is null && first.TryGetValue(key, out var itemId) ? itemId : null;
             first.TryAdd(key, item.Id);
@@ -221,10 +222,24 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
         await db.SaveChangesAsync(ct);
     }
 
-    /// <summary>An album of the target storage with the same date as the group (only when exactly one has it).</summary>
+    /// <summary>
+    /// An album of the target storage for the group: of a folder the album of the same name, else the album with the same date (only when exactly one has it).
+    /// </summary>
     private static async Task<long?> MatchingAlbumAsync(AppDbContext db, ImportSession session, ImportGroup group, CancellationToken ct)
     {
-        if (session.TargetStorageId is not { } target || group.StartDate is not { } start || group.Reason is "screenshots" or "nodate")
+        if (session.TargetStorageId is not { } target || group.Reason is "screenshots" or "nodate")
+        {
+            return null;
+        }
+
+        if (group.Reason == "folder")
+        {
+            var name = group.Name.ToLower();
+            var named = await db.Albums.Where(a => a.StorageId == target && a.Path != string.Empty && a.Name.ToLower() == name).Select(a => a.Id).Take(2).ToListAsync(ct);
+            return named.Count == 1 ? named[0] : null;
+        }
+
+        if (group.StartDate is not { } start)
         {
             return null;
         }

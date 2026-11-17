@@ -160,6 +160,57 @@ public sealed class LibraryTests
     }
 
     [Fact]
+    public void A_folder_a_person_made_is_one_album_whatever_the_camera_clock_says()
+    {
+        var options = new LibraryOptions(null, ".cache", 480, 2048, 82, "yyyy.MM.dd", 8, 50, 6, 0);
+        var items = new List<ImportItem>();
+        void Add(string folder, DateTime? taken, string? name = null)
+            => items.Add(new ImportItem
+            {
+                Id = items.Count + 1, State = ImportItemState.Ready, TakenDate = taken, DateSource = taken is null ? DateSource.FileDate : DateSource.Exif,
+                SourceFolder = folder, FileName = name ?? $"IMG_{items.Count + 1:0000}.jpg",
+            });
+
+        // two folders of a camera that was never set: the same night, taken in turns
+        var night = new DateTime(2006, 1, 2, 0, 1, 0);
+        for (var i = 0; i < 6; i++)
+        {
+            Add(i % 2 == 0 ? "2008 Familie Olleck" : "2008 Klassenkameraden", night.AddMinutes(i * 7));
+        }
+
+        // a holiday in day folders, a festival with one video a month later, a photo without a date
+        Add("2010 Urlaub Berlin/20100127", new DateTime(2010, 1, 27, 23, 0, 0));
+        Add("2010 Urlaub Berlin/20100131", new DateTime(2010, 1, 31, 12, 0, 0));
+        Add("2007 Wacken", new DateTime(2007, 7, 5, 21, 0, 0));
+        Add("2007 Wacken", new DateTime(2007, 8, 4, 21, 0, 0));
+        Add("2009 Weihnachten", new DateTime(2009, 12, 24, 13, 0, 0));
+        Add("2009 Weihnachten", null, "Bild 015.jpg");
+
+        // the folders of a phone name no album: they go by time
+        Add("DCIM/100APPLE", new DateTime(2024, 5, 1, 10, 0, 0));
+        Add("DCIM/100APPLE", new DateTime(2024, 5, 9, 10, 0, 0));
+
+        var groups = ImportService.Suggest(items, options, new DateOnly(2026, 1, 1));
+        Assert.Equal(
+            ["2008 Familie Olleck", "2008 Klassenkameraden", "2007.07.05 Wacken", "2009.12.24 Weihnachten", "2010.01.27 Urlaub Berlin", "2024.05.01", "2024.05.09"],
+            groups.Select(g => g.Group.Name));
+        Assert.Equal([3, 3, 2, 2, 2, 1, 1], groups.Select(g => g.Items.Count));
+        Assert.Equal(["folder", "folder", "folder", "folder", "folder", "time", "time"], groups.Select(g => g.Group.Reason));
+    }
+
+    [Theory]
+    [InlineData("2010 Urlaub Berlin/20100127", "2010 Urlaub Berlin")]
+    [InlineData("Reise/2010-01-27", "Reise")]
+    [InlineData("Fotos/Gardasee mit Oma", "Fotos/Gardasee mit Oma")]
+    [InlineData("DCIM/100CANON", null)]
+    [InlineData("WhatsApp Images", null)]
+    [InlineData("Fotos/2010", null)]
+    [InlineData("20100127", null)]
+    [InlineData(null, null)]
+    public void The_album_folder_of_an_import_leaves_out_days_and_the_folders_of_devices(string? source, string? expected)
+        => Assert.Equal(expected, AlbumNames.AlbumFolderOf(source));
+
+    [Fact]
     public void Similar_pictures_have_close_hashes_and_different_ones_do_not()
     {
         using var a = new MagickImage("plasma:#ff8040-#2040a0", 400, 300);

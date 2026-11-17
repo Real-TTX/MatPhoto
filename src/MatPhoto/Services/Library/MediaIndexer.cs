@@ -1,6 +1,7 @@
 using System.Security.Cryptography;
 using ImageMagick;
 using MatPhoto.Data;
+using MatPhoto.Localization;
 using MatPhoto.Services.Storages;
 
 namespace MatPhoto.Services.Library;
@@ -126,6 +127,11 @@ public sealed class MediaIndexer(ThumbnailCache cache, VideoTools video, Library
     {
         var fileName = Path.GetFileName(path);
         var format = MediaFormats.Of(fileName) ?? throw new StorageException(StorageError.NotSupported);
+        if (size <= 0)
+        {
+            throw new StorageException(StorageError.Worded, Text.T("Photos.Error.Empty"));
+        }
+
         var facts = new MediaFacts { Type = format.Type, MimeType = format.MimeType, Size = size, FileModified = DateTime.SpecifyKind(modifiedUtc, DateTimeKind.Utc) };
         MediaMetadata meta;
         if (format.Type == MediaType.Photo)
@@ -146,6 +152,11 @@ public sealed class MediaIndexer(ThumbnailCache cache, VideoTools video, Library
     {
         var format = MediaFormats.Of(fileName) ?? throw new StorageException(StorageError.NotSupported);
         var info = new FileInfo(file);
+        if (info.Exists && info.Length == 0)
+        {
+            throw new StorageException(StorageError.Worded, Text.T("Photos.Error.Empty"));
+        }
+
         var provider = new LocalProvider(Path.GetDirectoryName(file)!, null);
         var facts = new MediaFacts { Type = format.Type, MimeType = format.MimeType, Size = info.Length, FileModified = info.LastWriteTimeUtc };
         var meta = format.Type == MediaType.Photo

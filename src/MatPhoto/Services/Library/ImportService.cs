@@ -304,17 +304,28 @@ public static class ImportService
     }
 
     /// <summary>
-    /// The suggestion: the files that are no duplicates, ordered by their date, become groups. A new group starts when more than <see cref="LibraryOptions.ImportGapHours"/>
-    /// lie between two photos on different days, or when two photos in a row were taken more than <see cref="LibraryOptions.ImportDistanceKm"/> apart. Screenshots
-    /// become a group per month, files without a date one group of their own.
+    /// The suggestion for the files that are no duplicates. A folder a person made and named is one album, whatever the dates of its photos say (cameras with a
+    /// clock that was never set): <c>2010 Urlaub Berlin</c> with its day folders <c>20100127</c> … is one album. The other files (no folder, the folders of a phone
+    /// or a camera), ordered by their date, become groups: a new group starts when more than <see cref="LibraryOptions.ImportGapHours"/> lie between two photos on
+    /// different days, or when two photos in a row were taken more than <see cref="LibraryOptions.ImportDistanceKm"/> apart. Of those, screenshots become a group
+    /// per month, files without a date one group of their own.
     /// </summary>
     public static List<(ImportGroup Group, List<ImportItem> Items)> Suggest(IReadOnlyList<ImportItem> items, LibraryOptions options, DateOnly today)
     {
-        var result = new List<(ImportGroup, List<ImportItem>)>();
+        var result = new List<(ImportGroup Group, List<ImportItem> Items)>();
         var usable = items.Where(i => i.State == ImportItemState.Ready && i.DuplicateOfMediaId is null && i.DuplicateOfItemId is null).ToList();
-        var screenshots = usable.Where(i => (i.Traits & MediaTraits.Screenshot) != 0 && i.TakenDate is not null).ToList();
-        var undated = usable.Where(i => i.TakenDate is null || i.DateSource == DateSource.FileDate).Except(screenshots).ToList();
-        var dated = usable.Except(screenshots).Except(undated).OrderBy(i => i.TakenDate).ToList();
+
+        var foldered = usable.Select(i => (Item: i, Folder: AlbumNames.AlbumFolderOf(i.SourceFolder))).Where(x => x.Folder is not null).ToList();
+        foreach (var folder in foldered.GroupBy(x => x.Folder!, StringComparer.OrdinalIgnoreCase))
+        {
+            var list = folder.Select(x => x.Item).OrderBy(i => i.TakenDate ?? DateTime.MaxValue).ThenBy(i => i.FileName, StringComparer.OrdinalIgnoreCase).ToList();
+            result.Add((DescribeFolder(list, folder.Key, options), list));
+        }
+
+        var rest = usable.Except(foldered.Select(x => x.Item)).ToList();
+        var screenshots = rest.Where(i => (i.Traits & MediaTraits.Screenshot) != 0 && i.TakenDate is not null).ToList();
+        var undated = rest.Where(i => i.TakenDate is null || i.DateSource == DateSource.FileDate).Except(screenshots).ToList();
+        var dated = rest.Except(screenshots).Except(undated).OrderBy(i => i.TakenDate).ToList();
 
         var current = new List<ImportItem>();
         void Close()
@@ -335,8 +346,7 @@ public static class ImportService
                 var otherDay = item.TakenDate.Value.Date != last.TakenDate.Value.Date;
                 var far = item.Latitude is { } la && item.Longitude is { } lo && LastPosition(current) is { } p
                     && GeoPlaces.DistanceKm(p.Lat, p.Lon, la, lo) > options.ImportDistanceKm && gap > TimeSpan.FromHours(1);
-                var otherFolder = item.SourceFolder != last.SourceFolder;
-                if ((gap > TimeSpan.FromHours(options.ImportGapHours) && otherDay) || far || otherFolder)
+                if ((gap > TimeSpan.FromHours(options.ImportGapHours) && otherDay) || far)
                 {
                     Close();
                 }
@@ -346,6 +356,9 @@ public static class ImportService
         }
 
         Close();
+
+        // the folders and the times side by side, by their first photo (a folder without any date at the end)
+        result = [.. result.OrderBy(r => r.Group.StartDate ?? DateTime.MaxValue).ThenBy(r => r.Group.Name, StringComparer.OrdinalIgnoreCase)];
         foreach (var month in screenshots.GroupBy(i => (i.TakenDate!.Value.Year, i.TakenDate.Value.Month)).OrderBy(g => g.Key))
         {
             var list = month.OrderBy(i => i.TakenDate).ToList();
@@ -363,7 +376,7 @@ public static class ImportService
 
         for (var i = 0; i < result.Count; i++)
         {
-            result[i].Item1.Position = i + 1;
+            result[i].Group.Position = i + 1;
         }
 
         return result;
@@ -382,24 +395,54 @@ public static class ImportService
         return null;
     }
 
-    /// <summary>The name of a group: the date of its first photo and the folder the files came from, else the town most photos were taken in.</summary>
+    /// <summary>
+    /// The name of a folder's album. A date in the folder name stays; a year (<c>2010 Ausflug Hamburg</c>) becomes the first day of the folder in that year
+    /// (<c>2010.12.17 Ausflug Hamburg</c>), and when no photo of the folder is of that year the camera clock was wrong and the name stays as it is
+    /// (<c>2008 Familie Olleck</c>); a name without a date gets the date of the first photo.
+    /// </summary>
+    private static ImportGroup DescribeFolder(List<ImportItem> items, string folder, LibraryOptions options)
+    {
+        var group = Describe(items, "folder", options);
+        var name = AlbumNames.FolderName(folder);
+        var dates = items.Where(i => i.TakenDate != null && i.DateSource != DateSource.FileDate).Select(i => i.TakenDate!.Value).Order().ToList();
+        var (date, title) = AlbumNames.Parse(name);
+        if (date is not null)
+        {
+            group.Name = AlbumNames.Compose(date, title, options.AlbumDateFormat);
+        }
+        else if (AlbumNames.ParseYear(name) is { Year: { } year } named)
+        {
+            var first = dates.Where(d => d.Year == year).Select(d => (DateTime?)d).FirstOrDefault();
+            group.Name = first is { } day ? AlbumNames.Compose(DateOnly.FromDateTime(day), named.Title, options.AlbumDateFormat) : AlbumNames.Clean(name);
+        }
+        else
+        {
+            group.Name = AlbumNames.Compose(dates.Count > 0 ? DateOnly.FromDateTime(dates[0]) : null, name, options.AlbumDateFormat);
+        }
+
+        if (group.Name.Length == 0)
+        {
+            group.Name = AlbumNames.Clean(name);
+        }
+
+        return group;
+    }
+
+    /// <summary>The name of a group: the date of its first photo and the town most photos were taken in.</summary>
     private static ImportGroup Describe(List<ImportItem> items, string reason, LibraryOptions options)
     {
         var start = items.Where(i => i.TakenDate != null).Select(i => i.TakenDate!.Value).DefaultIfEmpty().Min();
         var end = items.Where(i => i.TakenDate != null).Select(i => i.TakenDate!.Value).DefaultIfEmpty().Max();
         var place = items.Where(i => i.City != null).GroupBy(i => i.City).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault()
             ?? items.Where(i => i.Country != null).GroupBy(i => i.Country).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
-        var folder = items.Select(i => i.SourceFolder).Distinct().ToList() is [{ } only] ? AlbumNames.FolderName(only) : null;
-        var title = folder is { Length: > 0 } ? AlbumNames.Parse(folder).Title : place;
         var date = start == default ? (DateOnly?)null : DateOnly.FromDateTime(start);
-        var folderDate = folder is { Length: > 0 } ? AlbumNames.Parse(folder).Date : null;
         return new ImportGroup
         {
-            Name = AlbumNames.Compose(folderDate ?? date, title, options.AlbumDateFormat),
+            Name = AlbumNames.Compose(date, place, options.AlbumDateFormat),
             StartDate = start == default ? null : start,
             EndDate = end == default ? null : end,
             Place = place,
-            Reason = folder is { Length: > 0 } && reason == "time" ? "folder" : place is not null && reason == "time" ? "place" : reason,
+            Reason = place is not null && reason == "time" ? "place" : reason,
             ItemCount = items.Count,
         };
     }

@@ -1,6 +1,7 @@
 {
   "Photos.Title": { "en": "Photos", "de": "Fotos" },
   "Photos.Sub": { "en": "{0} photos and {1} videos of your storages", "de": "{0} Fotos und {1} Videos aus deinen Speichern" },
+  "Photos.Error.Empty": { "en": "The file is empty (0 bytes).", "de": "Die Datei ist leer (0 Bytes)." },
   "Photos.Empty": { "en": "No photos yet", "de": "Noch keine Fotos" },
   "Photos.EmptyText": { "en": "Import photos, or wait for the first scan of the storages to finish.", "de": "Importiere Fotos oder warte, bis der erste Scan der Speicher fertig ist." },
   "Photos.Pending": { "en": "{0} files are still being read; they appear as soon as their thumbnails are made.", "de": "{0} Dateien werden noch gelesen; sie erscheinen, sobald ihre Vorschaubilder fertig sind." },

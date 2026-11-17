@@ -73,6 +73,35 @@ public static partial class AlbumNames
         return text is "." or ".." ? string.Empty : text;
     }
 
+    [GeneratedRegex(@"^((?:19|20)\d{2})[\s_\-–]+(\S.*)$")]
+    private static partial Regex YearRegex();
+
+    /// <summary>Folders a camera, a phone or a messenger makes, and folders that only sort (<c>Fotos</c>, <c>2010</c>): they name no album.</summary>
+    [GeneratedRegex(@"^(dcim|camera|kamera|camera roll|aufnahmen|pictures|bilder|fotos|photos|images|img|videos|movies|screenshots|bildschirmfotos|download|downloads|whatsapp|whatsapp images|whatsapp video|whatsapp animated gifs|telegram|telegram images|signal|sent|private|inbox|eingang|import|imports|upload|uploads|neu|new|misc|sonstiges|temp|tmp|\d{3}[a-z_]{5}|\d{3}_\d{4}|\d{3}media|\d{1,4})$", RegexOptions.IgnoreCase)]
+    private static partial Regex GenericRegex();
+
+    /// <summary>A year at the start of a folder name and the rest (<c>2010 Ausflug Hamburg</c> → 2010, <c>Ausflug Hamburg</c>).</summary>
+    public static (int? Year, string Title) ParseYear(string name)
+    {
+        var match = YearRegex().Match(name.Trim());
+        return match.Success ? (int.Parse(match.Groups[1].Value, CultureInfo.InvariantCulture), match.Groups[2].Value.Trim()) : (null, name.Trim());
+    }
+
+    /// <summary>
+    /// The folder of an import that is an album a person made: the source folder without folders that are only a day (<c>2010 Urlaub Berlin/20100127</c> →
+    /// <c>2010 Urlaub Berlin</c>); null when what is left names no album (no folder, <c>DCIM/100CANON</c>, <c>WhatsApp Images</c>, <c>Fotos/2010</c>).
+    /// </summary>
+    public static string? AlbumFolderOf(string? sourceFolder)
+    {
+        var parts = (sourceFolder ?? string.Empty).Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+        while (parts.Count > 0 && Parse(parts[^1]) is { Date: not null, Title.Length: 0 })
+        {
+            parts.RemoveAt(parts.Count - 1);
+        }
+
+        return parts.Count == 0 || GenericRegex().IsMatch(parts[^1]) ? null : string.Join('/', parts);
+    }
+
     /// <summary>The last part of a folder path (<c>2023/2023.11.09 Hochzeit</c> → <c>2023.11.09 Hochzeit</c>; the top is empty).</summary>
     public static string FolderName(string path)
     {
