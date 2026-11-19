@@ -50,5 +50,7 @@
   "Js.Import.Skipped": { "en": "{0} files were no photos or videos and were left out.", "de": "{0} Dateien waren keine Fotos oder Videos und wurden ausgelassen." },
   "Js.Import.FolderHas": { "en": "{0} photos and videos directly in this folder (its subfolders are read too).", "de": "{0} Fotos und Videos direkt in diesem Ordner (seine Unterordner werden mitgelesen)." },
   "Js.Import.AnalyzingNow": { "en": "{0} of {1} files read …", "de": "{0} von {1} Dateien gelesen …" },
-  "Js.Import.ImportingNow": { "en": "{0} of {1} files imported …", "de": "{0} von {1} Dateien importiert …" }
+  "Js.Import.ImportingNow": { "en": "{0} of {1} files imported …", "de": "{0} von {1} Dateien importiert …" },
+  "Js.Import.Back": { "en": "Back to the import", "de": "Zurück zum Import" },
+  "Js.Import.Position": { "en": "{0} of {1}", "de": "{0} von {1}" }
 }

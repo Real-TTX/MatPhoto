@@ -9,6 +9,28 @@
     var running = v.State is ImportState.Collecting or ImportState.Analyzing or ImportState.Importing;
     var percent = v.TotalCount == 0 ? 0 : (int)Math.Round(100.0 * v.DoneCount / v.TotalCount);
     var groupsTotal = v.Groups.Sum(g => g.Items.Count);
+    var token = v.Token.ToString("n");
+    const int StripShown = 14;
+
+    // a file of the import in a strip: a click shows it large (import.js); the ones after the first few wait behind "+N"
+    void Tile(ImportItemView i, bool later)
+    {
+        var place = i.City ?? i.Country;
+        var sub = string.Join(" · ", new[] { i.TakenDate?.ToString("g", System.Globalization.CultureInfo.CurrentUICulture), i.SourcePath.Contains('/') ? i.SourcePath : null, i.CameraModel, place }
+            .Where(s => !string.IsNullOrEmpty(s)));
+        <button type="button" class="md-strip__item" title="@i.FileName" aria-label="@i.FileName" hidden="@later" data-import-item="@i.Id" data-name="@i.FileName" data-sub="@sub"
+                data-video="@(i.Type == MediaType.Video ? "1" : "0")" data-thumb="@(i.HasThumb ? "1" : "0")">
+            @if (i.HasThumb)
+            {
+                <img src="/import/@token/thumb/@i.Id" alt="" loading="lazy" decoding="async" draggable="false" />
+            }
+            else
+            {
+                @Ui.Icon(i.Type == MediaType.Video ? "video" : "image")
+            }
+            @if (i.Type == MediaType.Video) { <span class="md-strip__badge">@Ui.Icon("play")</span> }
+        </button>
+    }
 }
 
 @if (running)
@@ -30,7 +52,7 @@ else if (v.State == ImportState.Done)
             var first = g.Items.FirstOrDefault(i => i.HasThumb);
             <div class="md-card">
                 <span class="md-card__media">@if (first is not null) { <img src="/import/@v.Token.ToString("n")/thumb/@first.Id" alt="" loading="lazy" /> } else { @Ui.Icon("album", "md-card__placeholder") }</span>
-                <span class="md-card__body"><span class="md-card__title">@g.Name</span><span class="md-card__meta">@L["Import.Files", g.Items.Count(i => i.State == ImportItemState.Imported)]</span></span>
+                <span class="md-card__body"><span class="md-card__title">@g.Name</span><span class="md-card__meta">@L["Import.Files", g.Items.Count(i => i.State == ImportItemState.Imported)]@(AlbumText.Places(g.Items.Select(i => (i.City, i.Country))) is { } where ? " · " + where : "")</span></span>
             </div>
         }
     </div>
@@ -72,27 +94,33 @@ else
                 <div class="mat-card__head md-group__head">
                     <h2 class="mat-card__title" id="group-@g.Id">@Ui.Icon(g.Reason switch { "screenshots" => "screenshot", "nodate" => "calendar", "place" => "map-pin", "folder" => "folder", _ => "album" })<span>@L["Import.Group", n + 1]</span></h2>
                     <span class="mat-pill mat-pill--plain">@L["Import.Reason." + g.Reason]</span>
-                    <span class="md-group__meta">@AlbumText.Dates(null, g.StartDate, g.EndDate)@(g.Place is null ? "" : " · " + g.Place) · @L["Import.Files", g.Items.Count]</span>
+                    <span class="md-group__meta">@AlbumText.Dates(null, g.StartDate, g.EndDate) · @L["Import.Files", g.Items.Count]</span>
                 </div>
                 <div class="mat-card__body mat-form">
-                    <div class="md-strip">
-                        @foreach (var i in g.Items.Take(14))
+                    @{
+                        var places = AlbumText.Places(g.Items.Select(i => (i.City, i.Country)));
+                        var located = g.Items.Count(i => i.City is not null || i.Country is not null);
+                    }
+                    <p class="md-group__place@(places is null ? " is-unknown" : "")">
+                        @Ui.Icon("map-pin")
+                        @if (places is null)
                         {
-                            <span class="md-strip__item" title="@i.FileName">
-                                @if (i.HasThumb)
-                                {
-                                    <img src="/import/@v.Token.ToString("n")/thumb/@i.Id" alt="" loading="lazy" decoding="async" />
-                                }
-                                else
-                                {
-                                    @Ui.Icon(i.Type == MediaType.Video ? "video" : "image")
-                                }
-                                @if (i.Type == MediaType.Video) { <span class="md-strip__badge">@Ui.Icon("play")</span> }
-                            </span>
+                            <span>@L["Import.NoPlace"]</span>
                         }
-                        @if (g.Items.Count > 14)
+                        else
                         {
-                            <span class="md-strip__more">+@(g.Items.Count - 14)</span>
+                            <span>@places</span>
+                            @if (located < g.Items.Count) { <small>@L["Import.PlaceCount", located, g.Items.Count]</small> }
+                        }
+                    </p>
+                    <div class="md-strip" data-import-strip>
+                        @for (var k = 0; k < g.Items.Count; k++)
+                        {
+                            Tile(g.Items[k], k >= StripShown);
+                        }
+                        @if (g.Items.Count > StripShown)
+                        {
+                            <button type="button" class="md-strip__more" data-strip-more aria-label="@L["Import.ShowAll", g.Items.Count]" title="@L["Import.ShowAll", g.Items.Count]">+@(g.Items.Count - StripShown)</button>
                         }
                     </div>
                     <div class="mat-form__grid">
@@ -118,10 +146,14 @@ else
                 <summary class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("duplicate")@L["Import.Duplicates", v.Duplicates.Count]</h2></summary>
                 <div class="mat-card__body">
                     <p class="mat-hint">@L["Import.Duplicates.Hint"]</p>
-                    <div class="md-strip">
-                        @foreach (var i in v.Duplicates.Take(40))
+                    <div class="md-strip" data-import-strip>
+                        @for (var k = 0; k < v.Duplicates.Count; k++)
                         {
-                            <span class="md-strip__item" title="@i.FileName">@if (i.HasThumb) { <img src="/import/@v.Token.ToString("n")/thumb/@i.Id" alt="" loading="lazy" /> } else { @Ui.Icon("image") }</span>
+                            Tile(v.Duplicates[k], k >= 40);
+                        }
+                        @if (v.Duplicates.Count > 40)
+                        {
+                            <button type="button" class="md-strip__more" data-strip-more aria-label="@L["Import.ShowAll", v.Duplicates.Count]" title="@L["Import.ShowAll", v.Duplicates.Count]">+@(v.Duplicates.Count - 40)</button>
                         }
                     </div>
                 </div>

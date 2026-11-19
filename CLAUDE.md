@@ -62,7 +62,7 @@ src/MatPhoto
                              large remote videos as head + tail), ImageRenderer (Magick.NET, dHash), VideoTools (ffprobe/ffmpeg), MetadataReader (MetadataExtractor,
                              dates from names), GeoPlaces (offline towns), ThumbnailCache (data volume or a storage; memory LRU), LibrarySettings (settings in memory),
                              ImportWorker (hosted: analysis and run), MediaFormats, AlbumNames, MediaScope, LibraryEndpoints (/media/{id}/thumb|preview|original,
-                             /import/{token}/thumb/{item}, /live/*)
+                             /import/{token}/thumb|preview|original/{item}: the review page shows the files large, /live/*)
   Services/Accounts|Auth/    profiles, user administration, sessions in the DB, MatIdentity sign-in, GDPR export/erase
   Services/                  InstanceService (numbers, settings, housekeeping), MenuService, Ui (icons, logo, bytes), ListModels (toolbar, pager), Dates, Assets
   MatPlatform/               copy of the shared package (MatDesign, 2.4.0). Never edit here.
@@ -71,7 +71,7 @@ src/MatPhoto
   Pages/                     Photos (timeline), Explore (+View?scope=), Albums (Index, View/{id}, Edit), Lists (Index, View/{id}, Edit), Favorites, Search,
                              Duplicates, Import (Index, Review/{token}, History), Account, Admin (Users, Storages: Edit/Access, Scans, System with tabs, Connections,
                              Activity), About; Shared/_PhotoGrid (the grid of every photo page), _Cards, _GridZoom
-  wwwroot/js/                photos.js (grid: buckets, justified rows, virtualisation, selection, viewer with preload/swipe/zoom/slideshow), import.js (uploads,
+  wwwroot/js/                photos.js (grid: buckets, justified rows, virtualisation, selection, viewer with preload/swipe/zoom/slideshow), import.js (uploads, the viewer of the review page,
                              folders, progress), scans.js, util.js, offline.js, pwa.js; sw.js (shell cache, thumbnails cache-first, grids network-first)
   wwwroot/css/app.css        accent + the styles of the app (prefix md-)
   Resources/Geo/             cities.tsv.gz + countries.tsv (GeoNames, CC BY 4.0: towns of 15,000 people or more)

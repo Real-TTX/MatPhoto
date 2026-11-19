@@ -28,4 +28,27 @@ public static class AlbumText
             ? $"{s.ToString("d MMM", culture)} – {e.ToString("d MMM yyyy", culture)}"
             : $"{s.ToString("d MMM yyyy", culture)} – {e.ToString("d MMM yyyy", culture)}";
     }
+
+    /// <summary>
+    /// Where the photos of a group were taken, as information: the towns most photos have (at most <paramref name="max"/>, "+2" for the others) and the country
+    /// when they all lie in one ("Berlin, Potsdam · Germany"); null when no photo knows its place.
+    /// </summary>
+    public static string? Places(IEnumerable<(string? City, string? Country)> photos, int max = 3)
+    {
+        var known = photos.Where(p => p.City is not null || p.Country is not null).ToList();
+        if (known.Count == 0)
+        {
+            return null;
+        }
+
+        var towns = known.Where(p => p.City is not null).GroupBy(p => p.City!).OrderByDescending(g => g.Count()).ThenBy(g => g.Key).Select(g => g.Key).ToList();
+        var countries = known.Where(p => p.Country is not null).Select(p => p.Country!).Distinct().ToList();
+        var text = string.Join(", ", towns.Take(max)) + (towns.Count > max ? $" +{towns.Count - max}" : string.Empty);
+        if (countries.Count == 1)
+        {
+            return text.Length == 0 ? countries[0] : $"{text} · {countries[0]}";
+        }
+
+        return text.Length == 0 ? string.Join(", ", countries.Take(max)) : text;
+    }
 }

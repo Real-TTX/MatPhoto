@@ -267,11 +267,22 @@ html.md-viewer-open, html.md-viewer-open body { overflow: hidden; }
 /* a suggested album: the strip of its photos */
 .md-group__head { flex-wrap: wrap; gap: var(--mat-space-2) var(--mat-space-3); }
 .md-group__meta { color: var(--mat-text-muted); font-size: var(--mat-fs-sm); }
+.md-group__place { display: flex; align-items: center; flex-wrap: wrap; gap: var(--mat-space-1) var(--mat-space-2); margin: 0; font-weight: 600; }
+.md-group__place .mat-icon { width: 16px; height: 16px; color: var(--mat-accent); }
+.md-group__place small { color: var(--mat-text-muted); font-size: var(--mat-fs-xs); font-weight: 400; }
+.md-group__place.is-unknown { color: var(--mat-text-muted); font-size: var(--mat-fs-sm); font-weight: 400; }
+.md-group__place.is-unknown .mat-icon { color: inherit; }
 .md-strip { display: flex; flex-wrap: wrap; gap: 4px; }
 .md-strip__item { position: relative; display: grid; place-items: center; width: 72px; height: 72px; overflow: hidden; border-radius: var(--mat-radius-sm); background: var(--mat-surface-3); color: var(--mat-text-muted); }
 .md-strip__item img { width: 100%; height: 100%; object-fit: cover; }
 .md-strip__badge { position: absolute; right: 3px; bottom: 3px; display: grid; place-items: center; width: 18px; height: 18px; border-radius: 50%; background: rgba(0, 0, 0, .55); color: #fff; }
 .md-strip__badge .mat-icon { width: 10px; height: 10px; }
+button.md-strip__item, button.md-strip__more { padding: 0; border: 0; font: inherit; cursor: pointer; }
+button.md-strip__item { cursor: zoom-in; transition: transform var(--mat-dur) var(--mat-ease), box-shadow var(--mat-dur) var(--mat-ease); }
+button.md-strip__item:hover { box-shadow: 0 0 0 2px var(--mat-accent); }
+button.md-strip__item:focus-visible, button.md-strip__more:focus-visible { outline: 2px solid var(--mat-accent); outline-offset: 2px; }
+button.md-strip__more:hover { background: var(--mat-surface-3); color: var(--mat-text); }
+.md-strip__item[hidden] { display: none; }
 .md-strip__more { display: grid; place-items: center; width: 72px; height: 72px; border-radius: var(--mat-radius-sm); background: var(--mat-surface-2); color: var(--mat-text-muted); font-weight: 650; }
 @media (max-width: 599px) { .md-strip__item, .md-strip__more { width: 56px; height: 56px; } }
 .md-dupes-import > summary { cursor: pointer; list-style: none; }

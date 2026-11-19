@@ -23,6 +23,9 @@ public sealed record ImportDecision(long? TargetStorageId, string? TargetFolder,
 
 public sealed record ImportGroupDecision(long Id, string? Name, bool Include, long? ExistingAlbumId);
 
+/// <summary>A file of an import to look at: in a storage (<see cref="Storage"/> + <see cref="Path"/>) or in the staging folder (<see cref="LocalFile"/>).</summary>
+public sealed record ImportFile(string FileName, string MimeType, long Size, DateTime Modified, Storage? Storage, string? Path, string? LocalFile);
+
 /// <summary>An album that exists and might be the right one for a group (the select on the review page).</summary>
 public sealed record AlbumChoice(long Id, string Name, long StorageId, DateTime? StartDate);
 
@@ -162,6 +165,46 @@ public static class ImportService
             groups.Select(g => new ImportGroupView(g.Id, g.Position, g.Name, g.StartDate, g.EndDate, g.Place, g.Reason, g.Include, g.ExistingAlbumId, byGroup[g.Id].Select(View).ToList())).ToList(),
             items.Where(i => i.DuplicateOfMediaId != null || i.DuplicateOfItemId != null).Select(View).ToList(),
             items.Where(i => i.ImportGroupId == null && i.DuplicateOfMediaId == null && i.DuplicateOfItemId == null && i.State is ImportItemState.Failed).Select(View).ToList());
+    }
+
+    /// <summary>The content hash of a file of an import of the person (its thumbnail and preview in the cache), or null.</summary>
+    public static async Task<string?> ItemHashAsync(AppDbContext db, long userId, Guid token, long itemId, CancellationToken ct = default)
+    {
+        var hash = await db.ImportItems.Where(i => i.Id == itemId && i.ImportSession!.Token == token && i.ImportSession.UserId == userId)
+            .Select(i => i.ContentHash).FirstOrDefaultAsync(ct);
+        return hash is { Length: > 0 } ? hash : null;
+    }
+
+    /// <summary>
+    /// Where a file of an import of the person lies now, to be looked at on the review page: the staging folder of an upload, the folder of the source storage, or
+    /// (once imported) its album. Null when it is not the person's or they may no longer read the storage.
+    /// </summary>
+    public static async Task<ImportFile?> FileAsync(AppDbContext db, long userId, Guid token, long itemId, string dataDirectory, CancellationToken ct = default)
+    {
+        var row = await db.ImportItems.AsNoTracking().Where(i => i.Id == itemId && i.ImportSession!.Token == token && i.ImportSession.UserId == userId)
+            .Select(i => new { Item = i, i.ImportSession!.Source, i.ImportSession.SourceStorageId, i.ImportSession.TargetStorageId }).FirstOrDefaultAsync(ct);
+        if (row is null)
+        {
+            return null;
+        }
+
+        var item = row.Item;
+        var mime = MediaFormats.Of(item.FileName)?.MimeType ?? "application/octet-stream";
+        var (storageId, path) = item.State == ImportItemState.Imported && item.TargetPath is { } target && row.TargetStorageId is { } into
+            ? (into, target)
+            : (row.SourceStorageId, item.SourcePath);
+        if (row.Source == ImportSource.Upload && item.State != ImportItemState.Imported)
+        {
+            var file = Path.Combine(StagingFolder(dataDirectory, token), item.SourcePath);
+            return File.Exists(file) ? new ImportFile(item.FileName, mime, item.Size, item.FileModified, null, null, file) : null;
+        }
+
+        if (storageId is not { } id || await StorageAccess.FindAsync(db, userId, id, AccessRole.Viewer, ct) is not { } found)
+        {
+            return null;
+        }
+
+        return new ImportFile(item.FileName, mime, item.Size, item.FileModified, found.Storage, path, null);
     }
 
     /// <summary>The imports of a person, newest first (the page History).</summary>

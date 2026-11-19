@@ -198,6 +198,17 @@ public sealed class LibraryTests
         Assert.Equal(["folder", "folder", "folder", "folder", "folder", "time", "time"], groups.Select(g => g.Group.Reason));
     }
 
+    [Fact]
+    public void The_places_of_a_group_read_as_towns_and_their_country()
+    {
+        (string?, string?) P(string? city, string? country) => (city, country);
+        Assert.Null(AlbumText.Places([P(null, null), P(null, null)]));
+        Assert.Equal("Berlin, Potsdam · Germany", AlbumText.Places([P("Potsdam", "Germany"), P("Berlin", "Germany"), P("Berlin", "Germany"), P(null, null)]));
+        Assert.Equal("Munich, Salzburg", AlbumText.Places([P("Munich", "Germany"), P("Munich", "Germany"), P("Salzburg", "Austria")]));
+        Assert.Equal("A, B, C +1 · Italy", AlbumText.Places([P("A", "Italy"), P("B", "Italy"), P("C", "Italy"), P("D", "Italy")]));
+        Assert.Equal("Germany", AlbumText.Places([P(null, "Germany")]));
+    }
+
     [Theory]
     [InlineData("2010 Urlaub Berlin/20100127", "2010 Urlaub Berlin")]
     [InlineData("Reise/2010-01-27", "Reise")]

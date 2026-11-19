@@ -53,17 +53,25 @@ public static class LibraryEndpoints
             return media?.Storage is null ? Results.NotFound() : await OriginalAsync(http, connections, media.Storage, media.Path, media.FileName, media.MimeType, media.Size, media.FileModified, download == true);
         });
 
-        app.MapGet("/import/{token:guid}/thumb/{itemId:long}", async (Guid token, long itemId, HttpContext http, AppDbContext db, CurrentUser me, ThumbnailCache cache) =>
+        // the files of an import (the review page shows them before they are in the library)
+        app.MapGet("/import/{token:guid}/thumb/{itemId:long}", (Guid token, long itemId, HttpContext http, AppDbContext db, CurrentUser me, ThumbnailCache cache)
+            => ImportPicture(token, itemId, ThumbKind.Thumb, http, db, me, cache));
+        app.MapGet("/import/{token:guid}/preview/{itemId:long}", (Guid token, long itemId, HttpContext http, AppDbContext db, CurrentUser me, ThumbnailCache cache)
+            => ImportPicture(token, itemId, ThumbKind.Preview, http, db, me, cache));
+        app.MapMethods("/import/{token:guid}/original/{itemId:long}", ["GET", "HEAD"], async (Guid token, long itemId, HttpContext http, AppDbContext db, CurrentUser me,
+            StorageConnections connections, IConfiguration configuration) =>
         {
-            var hash = await db.ImportItems.Where(i => i.Id == itemId && i.ImportSession!.Token == token && i.ImportSession.UserId == me.RequiredId).Select(i => i.ContentHash).FirstOrDefaultAsync(http.RequestAborted);
-            var data = hash is null ? null : await cache.ReadAsync(hash, ThumbKind.Thumb, http.RequestAborted);
-            if (data is null)
+            var file = await ImportService.FileAsync(db, me.RequiredId, token, itemId, configuration["DataDirectory"] ?? "/data", http.RequestAborted);
+            if (file?.LocalFile is { } local)
             {
-                return Results.NotFound();
+                OriginalHeaders(http);
+                return Results.File(local, Inline(file.MimeType) ? file.MimeType : "application/octet-stream", null,
+                    new DateTimeOffset(DateTime.SpecifyKind(file.Modified, DateTimeKind.Utc)), enableRangeProcessing: true);
             }
 
-            http.Response.Headers.CacheControl = "private, max-age=3600";
-            return Results.Bytes(data, "image/jpeg");
+            return file?.Storage is null || file.Path is null
+                ? Results.NotFound()
+                : await OriginalAsync(http, connections, file.Storage, file.Path, file.FileName, file.MimeType, file.Size, file.Modified, download: false);
         });
 
         // ---- the JSON of the grids and the viewer ----------------------------------------------------------------------------------
@@ -333,15 +341,40 @@ public static class LibraryEndpoints
     /// The file itself: from a local storage with the ranges of ASP.NET Core; from a remote one streamed from the asked offset (one range: what a video player asks).
     /// Shown inline only for pictures and videos (never SVG or HTML), always with a sandbox.
     /// </summary>
-    public static async Task<IResult> OriginalAsync(HttpContext http, StorageConnections connections, Storage storage, string path, string fileName, string mime, long size, DateTime modified,
-        bool download)
+    /// <summary>Images and videos are shown in the page; anything else (and SVG, which could hold a script) only downloads.</summary>
+    private static bool Inline(string mime)
+        => (mime.StartsWith("image/", StringComparison.Ordinal) || mime.StartsWith("video/", StringComparison.Ordinal)) && mime != "image/svg+xml";
+
+    /// <summary>An original gets a policy of its own: nothing runs, nothing loads.</summary>
+    private static void OriginalHeaders(HttpContext http)
     {
-        var inline = !download && (mime.StartsWith("image/", StringComparison.Ordinal) || mime.StartsWith("video/", StringComparison.Ordinal)) && mime != "image/svg+xml";
-        var type = inline ? mime : "application/octet-stream";
         var headers = http.Response.Headers;
         headers[HeaderNames.XContentTypeOptions] = "nosniff";
         headers.CacheControl = "private, max-age=3600";
         headers.ContentSecurityPolicy = "default-src 'none'; img-src 'self' data:; media-src 'self'; sandbox; frame-ancestors 'self'";
+    }
+
+    /// <summary>The thumbnail or the preview of a file of an import (only of the person's own imports).</summary>
+    private static async Task<IResult> ImportPicture(Guid token, long itemId, ThumbKind kind, HttpContext http, AppDbContext db, CurrentUser me, ThumbnailCache cache)
+    {
+        var hash = await ImportService.ItemHashAsync(db, me.RequiredId, token, itemId, http.RequestAborted);
+        var data = hash is null ? null : await cache.ReadAsync(hash, kind, http.RequestAborted);
+        if (data is null)
+        {
+            return Results.NotFound();
+        }
+
+        http.Response.Headers.CacheControl = "private, max-age=3600";
+        return Results.Bytes(data, "image/jpeg");
+    }
+
+    public static async Task<IResult> OriginalAsync(HttpContext http, StorageConnections connections, Storage storage, string path, string fileName, string mime, long size, DateTime modified,
+        bool download)
+    {
+        var inline = !download && Inline(mime);
+        var type = inline ? mime : "application/octet-stream";
+        var headers = http.Response.Headers;
+        OriginalHeaders(http);
         var lastModified = new DateTimeOffset(DateTime.SpecifyKind(modified, DateTimeKind.Utc));
         var provider = connections.Create(storage);
         if (provider.LocalPathOf(path) is { } local)
