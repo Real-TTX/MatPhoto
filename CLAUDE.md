@@ -15,8 +15,9 @@ storage (the NAS), keyed by the content hash. **Explore** makes automatic albums
 person checks the names and MatPhoto copies or moves the files into folders. Nothing is ever deleted for good: "delete" moves into `.matphoto-trash/` of the storage.
 
 Part of the Mat family on **MatPlatform 2.4** (MatDesign `docs/APP-MODEL.md`): MatPhoto **consumes** `identity.oidc` (sign-in through **MatIdentity**) and
-`mail.smtp` (**MatSMTP**), both optional; it **contributes** the launcher Photos (quick actions Import, Albums, Explore, Favourites) and two admin widgets. Faces
-(people) are not recognised yet (Explore says so); AI features are not part of it yet.
+`mail.smtp` (**MatSMTP**), both optional; it **contributes** the launcher Photos (quick actions Import, Albums, Explore, Favourites) and two admin widgets. **People**:
+faces are found and grouped into people on the server itself (YuNet + SFace of the OpenCV model zoo with ONNX Runtime, CPU only; off until an administrator switches
+it on). Other AI features are not part of it yet.
 
 Stack: ASP.NET Core on **.NET 10**, C#, **Razor Pages**, EF Core + **PostgreSQL**, the **MatUi** toolkit of MatDesign (`wwwroot/matui`, release **0.12.0**,
 bundled from `origin/main`: never edit by hand), plain JavaScript ES modules without a build step. Magick.NET (ImageMagick), MetadataExtractor (EXIF/XMP/QuickTime),
@@ -28,7 +29,7 @@ ffmpeg/ffprobe in the image, SMBLibrary, SSH.NET, FluentFTP. Docker-first. Web p
 - **Build:** `dotnet build MatPhoto.slnx` (SDK 10, `global.json`). Expected: 0 warnings, 0 errors.
 - **Tests:** `dotnet test`. Database tests run when `MATPHOTO_TEST_DB` is set (an administrator connection string, e.g.
   `Host=localhost;Port=4832;Username=matphoto;Password=matphoto;Database=postgres` while the local stack runs); each test creates, migrates and drops a database of its own.
-  `LibraryDbTests`: scan, visibility, moves, album rename and trash, duplicates, lists. `LibraryTests`: names, dates, places, scopes, the import suggestion, dHash,
+  `LibraryDbTests`: scan, visibility, moves, album rename and trash, duplicates, lists, people (grouping, naming, joining, "not this person", forgetting). `LibraryTests`: names, dates, places, scopes, the import suggestion, dHash,
   the indexer with a real JPEG. `TextCatalogTests` checks every text key of the server code and of the scripts (`t('Grid.X')` → `Js.Grid.X`) in English and German.
   `StorageRemoteTests` run against real SFTP/SMB/FTP/WebDAV servers when `MATPHOTO_TEST_STORAGES` is set (see the class).
 - **Run / test the app: always rebuild the container** (`./scripts/redeploy.ps1`, `-Clean` for empty volumes). CSS, JS and cshtml are baked into the image.
@@ -40,6 +41,9 @@ ffmpeg/ffprobe in the image, SMBLibrary, SSH.NET, FluentFTP. Docker-first. Web p
 - **Migrations:** `dotnet ef migrations add <Name> -p src/MatPhoto -o Data/Migrations` (local tool in `dotnet-tools.json`; a design-time factory exists). Applied at start-up.
 - **Updating MatUi:** take the release of MatDesign (`origin/main`): the CSS is the parts of `src/MatUi/wwwroot/css` joined in the order of the first line of `matui.css`;
   `matui.js`, `matui.boot.js`, `matui-icons.svg` as they are. **MatPlatform:** `node tools/matplatform-copy.js ../MatPhoto/src/MatPhoto` in MatDesign.
+- **Models of the face recognition:** `node scripts/models.js` downloads YuNet and SFace into `src/MatPhoto/models` (git-ignored; copied beside the app, the
+  tests use them). The Dockerfile downloads them itself (`ADD --checksum`, readable for the app user). `FaceTests.Probe` with `MATPHOTO_FACE_PROBE=<folder of JPEGs>`
+  draws the faces it finds into `out/` and prints how alike they are.
 - **Places:** `node scripts/geonames.js <folder with the GeoNames dumps>` writes `Resources/Geo` (towns of 15,000+, without the parts of a town).
 - **Logo:** `node scripts/logo.js` writes the SVGs (mark, favicon, maskable, mono, logo, logo-dark), `scripts/icons.ps1` the PNGs with Edge headless.
 - Write files with the editor tools, not with shell heredocs that contain apostrophes or backslashes.
@@ -63,12 +67,17 @@ src/MatPhoto
                              dates from names), GeoPlaces (offline towns), ThumbnailCache (data volume or a storage; memory LRU), LibrarySettings (settings in memory),
                              ImportWorker (hosted: analysis and run), MediaFormats, AlbumNames, MediaScope, LibraryEndpoints (/media/{id}/thumb|preview|original,
                              /import/{token}/thumb|preview|original/{item}: the review page shows the files large, /live/*)
+  Services/Faces/           the people: FaceEngine (ONNX Runtime: YuNet finds faces in 640 × 640 with five points, the face is turned onto the ArcFace template
+                             112 × 112, SFace makes 128 numbers of length 1), FaceGrouping (pure: a face joins the person of the most alike face ≥ 0.42, else 3 alike
+                             faces ≥ 0.47 make a new person without a name), FaceWorker (hosted: previews of the cache, newest first, then grouping), FaceCrops
+                             (round pictures of faces), PeopleService (business layer: list, name – a name another person has joins them –, merge, hide, "not this
+                             person", forget, stats, delete all; a person exists for a viewer only on photos they may see, who may then also name it)
   Services/Accounts|Auth/    profiles, user administration, sessions in the DB, MatIdentity sign-in, GDPR export/erase
   Services/                  InstanceService (numbers, settings, housekeeping), MenuService, Ui (icons, logo, bytes), ListModels (toolbar, pager), Dates, Assets
   MatPlatform/               copy of the shared package (MatDesign, 2.4.0). Never edit here.
   Platform/                  MatPhotoPlatform (tiles, settings, actions scanAll/checkStorages/cleanUp, launcher, widgets, health), MatPhotoIdentityUsers
   Controls/                  ONE code base per control: <md-field>, <md-buttons>, <md-table>, <md-tabs>/<md-tab>
-  Pages/                     Photos (timeline), Explore (+View?scope=), Albums (Index, View/{id}, Edit), Lists (Index, View/{id}, Edit), Favorites, Search,
+  Pages/                     Photos (timeline), Explore (+View?scope=), People (Index, View/{id} with "who is this?", Edit/{id}), Albums (Index, View/{id}, Edit), Lists (Index, View/{id}, Edit), Favorites, Search,
                              Duplicates, Import (Index, Review/{token}, History), Account, Admin (Users, Storages: Edit/Access, Scans, System with tabs, Connections,
                              Activity), About; Shared/_PhotoGrid (the grid of every photo page), _Cards, _GridZoom
   wwwroot/js/                photos.js (grid: buckets, justified rows, virtualisation, selection, viewer with preload/swipe/zoom/slideshow), import.js (uploads, the viewer of the review page,
@@ -92,7 +101,9 @@ Administrators manage storages but see their photos only with a role like anybod
 
 **Library**: a scan lists, adds new files at once (`ThumbState.Pending`, resumable), then indexes new/changed/pending files newest first (3 at a time); a new path with
 the hash and size of a vanished record takes that record (favourites and lists survive moves). Live Photos: photo + video ≤ 5 s of the same name. Folders a NAS keeps
-(`@eaDir`, `#recycle` …), hidden folders, `.matphoto-trash` and the cache folder are never scanned. A change of the cache place or the sizes sets every record to
+(`@eaDir`, `#recycle` …), hidden folders, `.matphoto-trash` and the cache folder are never scanned. **People**: `Media.FaceState` (Pending / Done / Failed; a changed file is looked at again), `Face` (box relative 0..1, `Embedding` real[128], `Clustered`,
+`IsIgnored` = forgotten, `IsConfirmed`), `Person` (soft delete, `Name` null = "who is this?", `IsHidden`, `CoverFaceId`), `FaceRejection` ("not this person").
+`SystemSetting.FacesEnabled` (off by default: biometric data). Scope `person:<id>`; the search finds names; the viewer info lists the people. A change of the cache place or the sizes sets every record to
 `Pending` (they stay visible) and the next scans make the thumbnails again. **Import suggestion** (`ImportService.Suggest`): a folder a person named is ONE album
 whatever the camera clock says (`AlbumNames.AlbumFolderOf`: day folders like `20100127` belong to their parent; device folders `DCIM`, `100CANON`, `WhatsApp Images`,
 `Fotos`, years name no album); a year in the name becomes the first date of that year, else the name stays (`2008 Familie Olleck`). Only the rest goes by time and

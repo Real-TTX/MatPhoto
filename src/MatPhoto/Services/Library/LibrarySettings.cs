@@ -14,12 +14,13 @@ public sealed record LibraryOptions(
     int ImportGapHours,
     int ImportDistanceKm,
     int SimilarThreshold,
-    long MaxUploadBytes)
+    long MaxUploadBytes,
+    bool FacesEnabled = false)
 {
     public static LibraryOptions From(SystemSetting s) => new(
         s.CacheStorageId, string.IsNullOrWhiteSpace(s.CacheFolder) ? ".matphoto-cache" : s.CacheFolder, Math.Clamp(s.ThumbnailHeight, 160, 1024), Math.Clamp(s.PreviewSize, 800, 4096),
         Math.Clamp(s.ThumbnailQuality, 50, 95), string.IsNullOrWhiteSpace(s.AlbumDateFormat) ? "yyyy.MM.dd" : s.AlbumDateFormat, Math.Clamp(s.ImportGapHours, 1, 240),
-        Math.Clamp(s.ImportDistanceKm, 1, 5000), Math.Clamp(s.SimilarThreshold, 0, 12), Math.Max(0, s.MaxUploadBytes));
+        Math.Clamp(s.ImportDistanceKm, 1, 5000), Math.Clamp(s.SimilarThreshold, 0, 12), Math.Max(0, s.MaxUploadBytes), s.FacesEnabled);
 }
 
 /// <summary>

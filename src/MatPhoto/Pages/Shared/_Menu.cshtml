@@ -2,10 +2,10 @@
 @inject CurrentUser Me
 @*
     The menus (SHELL-01 .. SHELL-19): one panel per menu of the switcher at the foot (SHELL-15), the one of the page shown.
-    - photos:   Import (the main action), Photos, Explore, Albums, Favourites, Duplicates, Imports, the lists of the person
+    - photos:   Import (the main action), Photos, Explore, People (when the recognition is on), Albums, Favourites, Duplicates, Imports, the lists of the person
     - settings: profile, password, my data
     - admin:    users, storages, scans, connections, activity, system (administrators only)
-    A page names what it shows: ViewData["NavKey"] ("photos", "explore", "albums", "favorites", "duplicates", "imports", "list-4").
+    A page names what it shows: ViewData["NavKey"] ("photos", "explore", "people", "albums", "favorites", "duplicates", "imports", "list-4").
 *@
 @{
     var m = Model.Menu;
@@ -25,6 +25,10 @@
         }
         <li><a class="@Cls(key == "photos")" href="/Photos" aria-current="@Cur(key == "photos")">@Ui.Icon("image")<span>@L["Photos.Title"]</span></a></li>
         <li><a class="@Cls(key == "explore")" href="/Explore" aria-current="@Cur(key == "explore")">@Ui.Icon("compass")<span>@L["Explore.Title"]</span></a></li>
+        @if (m.People)
+        {
+            <li><a class="@Cls(key == "people")" href="/People" aria-current="@Cur(key == "people")">@Ui.Icon("users")<span>@L["People.Title"]</span></a></li>
+        }
         <li><a class="@Cls(key == "albums")" href="/Albums" aria-current="@Cur(key == "albums")">@Ui.Icon("album")<span>@L["Albums.Title"]</span></a></li>
         <li><a class="@Cls(key == "favorites")" href="/Favorites" aria-current="@Cur(key == "favorites")">@Ui.Icon("heart")<span>@L["Favorites.Title"]</span></a></li>
         <li><a class="@Cls(key == "duplicates")" href="/Duplicates" aria-current="@Cur(key == "duplicates")">@Ui.Icon("duplicate")<span>@L["Duplicates.Title"]</span></a></li>

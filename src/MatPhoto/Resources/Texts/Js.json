@@ -34,6 +34,7 @@
   "Js.Viewer.Previous": { "en": "Previous photo", "de": "Vorheriges Foto" },
   "Js.Viewer.Next": { "en": "Next photo", "de": "Nächstes Foto" },
   "Js.Viewer.Info": { "en": "Info", "de": "Info" },
+  "Js.Viewer.People": { "en": "People", "de": "Personen" },
   "Js.Viewer.Favorite": { "en": "Favourite", "de": "Favorit" },
   "Js.Viewer.Download": { "en": "Download the original", "de": "Original herunterladen" },
   "Js.Viewer.Zoom": { "en": "Zoom", "de": "Zoomen" },

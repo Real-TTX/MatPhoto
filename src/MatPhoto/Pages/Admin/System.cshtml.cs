@@ -2,6 +2,8 @@ using MatPhoto.Data;
 using MatPhoto.Controls;
 using MatPhoto.Localization;
 using MatPhoto.Services;
+using MatPhoto.Services.Faces;
+using MatPhoto.Services.Library;
 using MatPhoto.Services.Mail;
 using MatPhoto.Services.Storages;
 using Microsoft.AspNetCore.Mvc;
@@ -10,15 +12,16 @@ using Microsoft.EntityFrameworkCore;
 namespace MatPhoto.Pages.Admin;
 
 /// <summary>
-/// The settings of the installation in three tabs: General (registration, public address, the largest upload), Thumbnails (where the cache lies – the data volume or a
-/// folder of a storage, e.g. the NAS – and the sizes and quality), Import (the date in album names, when a new album starts, the target, similar photos). Beside it what
+/// The settings of the installation in four tabs: General (registration, public address, the largest upload), Thumbnails (where the cache lies – the data volume or a
+/// folder of a storage, e.g. the NAS – and the sizes and quality), Import (the date in album names, when a new album starts, the target, similar photos), People (the
+/// recognition of faces on this server: on or off, how far it is, delete what it learnt). Beside it what
 /// is in the installation. The same values as the platform API; an address <c>MAT_PUBLIC_URL</c> sets is shown read-only.
 /// </summary>
-public sealed class SystemModel(InstanceService instance, MailService mail, AppDbContext db) : AppPageModel
+public sealed class SystemModel(InstanceService instance, MailService mail, AppDbContext db, FaceEngine engine, LibrarySettings library) : AppPageModel
 {
     private const long Mb = 1024L * 1024;
 
-    public static readonly string[] Tabs = ["general", "thumbnails", "import"];
+    public static readonly string[] Tabs = ["general", "thumbnails", "import", "people"];
 
     [BindProperty(SupportsGet = true)] public string Tab { get; set; } = "general";
 
@@ -49,6 +52,11 @@ public sealed class SystemModel(InstanceService instance, MailService mail, AppD
     [BindProperty] public string ImportFolder { get; set; } = string.Empty;
 
     [BindProperty] public int SimilarThreshold { get; set; } = 6;
+
+    [BindProperty] public bool FacesEnabled { get; set; }
+
+    /// <summary>How far the recognition of faces is (tab People).</summary>
+    public PeopleStats? People { get; private set; }
 
     /// <summary><c>MAT_PUBLIC_URL</c> sets the public address.</summary>
     public bool PublicUrlFixed { get; private set; }
@@ -87,6 +95,7 @@ public sealed class SystemModel(InstanceService instance, MailService mail, AppD
         ImportStorageId = s.ImportStorageId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
         ImportFolder = s.ImportFolder;
         SimilarThreshold = s.SimilarThreshold;
+        FacesEnabled = s.FacesEnabled;
         await LoadAsync();
     }
 
@@ -101,6 +110,7 @@ public sealed class SystemModel(InstanceService instance, MailService mail, AppD
                 PreviewSize: PreviewSize, ThumbnailQuality: ThumbnailQuality),
             "import" => new SettingsChange(AlbumDateFormat: AlbumDateFormat.Trim(), ImportGapHours: ImportGapHours, ImportDistanceKm: ImportDistanceKm,
                 ImportStorageId: long.TryParse(ImportStorageId, out var i) ? i : 0, ImportFolder: ImportFolder, SimilarThreshold: SimilarThreshold),
+            "people" => new SettingsChange(FacesEnabled: FacesEnabled),
             _ => new SettingsChange(RegistrationOpen: RegistrationOpen, PublicUrl: PublicUrl, MaxUploadBytes: Math.Max(0, MaxUploadMb) * Mb),
         };
         if (await instance.SaveSettingsAsync(change) is { } problem)
@@ -116,6 +126,14 @@ public sealed class SystemModel(InstanceService instance, MailService mail, AppD
         return LocalRedirect("/Admin/System?tab=" + Tab);
     }
 
+    /// <summary>Removes every face and every person (tab People).</summary>
+    public async Task<IActionResult> OnPostDeleteFacesAsync()
+    {
+        await PeopleService.DeleteAllAsync(db, UserId, HttpContext.RequestAborted);
+        Flash(Text.T("System.People.Deleted"));
+        return LocalRedirect("/Admin/System?tab=people");
+    }
+
     public async Task<IActionResult> OnPostCleanUpAsync()
     {
         var result = await instance.CleanUpAsync(HttpContext.RequestAborted);
@@ -126,6 +144,11 @@ public sealed class SystemModel(InstanceService instance, MailService mail, AppD
     private async Task LoadAsync()
     {
         Counts = await instance.SnapshotAsync();
+        if (Tab == "people")
+        {
+            People = await PeopleService.StatsAsync(db, library.Current.FacesEnabled, engine.IsAvailable, HttpContext.RequestAborted);
+        }
+
         Database = instance.DatabaseName();
         FreeBytes = instance.FreeSpace();
         var s = await instance.SettingsAsync();

@@ -1,0 +1,57 @@
+@page "/People/View/{id:long}"
+@model MatPhoto.Pages.People.ViewModel
+@{
+    var p = Model.Person;
+    ViewData["Title"] = Model.Title;
+    ViewData["PageSub"] = L["People.Photos", p.Photos.ToString("N0")].Value;
+    ViewData["NavKey"] = "people";
+    ViewData["Width"] = "wide";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["People.Title"].Value, "/People"), (Model.Title, null) };
+}
+@section TopActions {
+    <partial name="_GridZoom" />
+    @if (p.CanEdit)
+    {
+        <a class="mat-btn mat-btn--ghost mat-btn--icon" href="/People/Edit/@p.Id" aria-label="@L["People.Edit"]" data-tip="@L["People.Edit"]">@Ui.Icon("edit")</a>
+    }
+}
+
+<div class="md-person-head">
+    <span class="md-person__face md-person__face--large">
+        @if (p.CoverFaceId is { } face)
+        {
+            <img src="/faces/@face/thumb" alt="" decoding="async" />
+        }
+        else
+        {
+            @Ui.Icon("user")
+        }
+    </span>
+    @if (p.Name is null && p.CanEdit)
+    {
+        <form class="md-person-name" method="post" asp-page-handler="Name" novalidate>
+            <label class="mat-label" for="person-name">@L["People.WhoIsThis"]</label>
+            <div class="md-person-name__row">
+                <input class="mat-input" id="person-name" name="Name" maxlength="200" autocomplete="off" list="person-names" placeholder="@L["People.NamePlaceholder"]" required />
+                <button type="submit" class="mat-btn mat-btn--primary">@Ui.Icon("check")<span>@L["People.SaveName"]</span></button>
+            </div>
+            <datalist id="person-names">
+                @foreach (var n in Model.Names)
+                {
+                    <option value="@n.Name"></option>
+                }
+            </datalist>
+            <span class="mat-hint">@L["People.NameHint"]</span>
+        </form>
+    }
+    else if (p.Hidden)
+    {
+        <span class="mat-pill mat-pill--plain">@Ui.Icon("eye-off")@L["People.Hidden"]</span>
+    }
+</div>
+
+<partial name="_PhotoGrid" model="@(new GridModel("person:" + p.Id, Model.Title, "users", L["People.NoPhotos"].Value, L["People.NoPhotosText"].Value))" />
+
+@section Scripts {
+    <script type="module" src="~/js/photos.js" asp-append-version="true"></script>
+}

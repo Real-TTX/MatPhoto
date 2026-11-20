@@ -312,3 +312,44 @@ button.md-strip__more:hover { background: var(--mat-surface-3); color: var(--mat
   .md-viewer__title small { display: none; }
   .md-viewer__bar { gap: var(--mat-space-1); }
 }
+
+/* ---- People ----------------------------------------------------------------------------------------------------------------- */
+.md-section__more { margin-left: auto; font-size: var(--mat-fs-sm); font-weight: 500; }
+.md-people { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: var(--mat-space-5) var(--mat-space-3); }
+.md-people--row { grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); }
+.md-person { display: flex; flex-direction: column; align-items: center; gap: var(--mat-space-1); min-width: 0; padding: var(--mat-space-2); border-radius: var(--mat-radius-lg); color: inherit; text-align: center; text-decoration: none; }
+.md-person:hover { background: var(--mat-surface-2); }
+.md-person:focus-visible { outline: 2px solid var(--mat-accent); outline-offset: 2px; }
+.md-person__face { display: grid; place-items: center; width: 112px; max-width: 100%; aspect-ratio: 1; overflow: hidden; border-radius: 50%; background: var(--mat-surface-3); color: var(--mat-text-muted); }
+.md-person__face img { width: 100%; height: 100%; object-fit: cover; }
+.md-person__face .mat-icon { width: 40%; height: 40%; }
+.md-person__face--large { width: 96px; flex: none; }
+.md-person__name { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.md-person__name.is-unnamed { color: var(--mat-text-muted); font-weight: 500; font-style: italic; }
+.md-person__meta { color: var(--mat-text-muted); font-size: var(--mat-fs-xs); }
+.md-person-head { display: flex; align-items: center; flex-wrap: wrap; gap: var(--mat-space-4); margin-bottom: var(--mat-space-4); }
+.md-person-name { display: flex; flex-direction: column; gap: var(--mat-space-1); flex: 1 1 320px; max-width: 560px; }
+.md-person-name__row { display: flex; gap: var(--mat-space-2); }
+.md-person-name__row .mat-input { flex: 1 1 auto; min-width: 0; }
+.md-faces { display: grid; grid-template-columns: repeat(auto-fill, minmax(116px, 1fr)); gap: var(--mat-space-3); margin-top: var(--mat-space-3); }
+.md-face { display: flex; flex-direction: column; gap: 4px; padding: var(--mat-space-2); border: 1px solid var(--mat-border); border-radius: var(--mat-radius-lg); }
+.md-face:has(input[name="NotThem"]:checked) { border-color: var(--mat-danger, #c62828); background: color-mix(in srgb, var(--mat-danger, #c62828) 8%, transparent); }
+.md-face:has(input[name="NotThem"]:checked) .md-face__img { opacity: .45; }
+.md-face:has(input[name="Cover"]:checked) { border-color: var(--mat-accent); }
+.md-face__img { display: block; aspect-ratio: 1; overflow: hidden; border-radius: 50%; background: var(--mat-surface-3); }
+.md-face__img img { width: 100%; height: 100%; object-fit: cover; }
+.md-face__opt { display: flex; align-items: center; gap: 6px; font-size: var(--mat-fs-xs); cursor: pointer; }
+.md-face__opt input { accent-color: var(--mat-accent); margin: 0; }
+.md-face__opt--not input { accent-color: var(--mat-danger, #c62828); }
+.md-viewer__people { margin: 0 0 var(--mat-space-5); padding-bottom: var(--mat-space-4); border-bottom: 1px solid var(--mat-border); }
+.md-viewer__people h3 { margin: 0 0 var(--mat-space-2); font-size: var(--mat-fs-sm); color: var(--mat-text-muted); }
+.md-viewer__people-list { display: flex; flex-wrap: wrap; gap: var(--mat-space-2); }
+.md-viewer__person { display: inline-flex; align-items: center; gap: var(--mat-space-2); padding: 3px 12px 3px 3px; border: 1px solid var(--mat-border); border-radius: 999px; color: inherit; text-decoration: none; font-size: var(--mat-fs-sm); }
+.md-viewer__person:hover { background: var(--mat-surface-2); }
+.md-viewer__person img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
+.md-viewer__person.is-unnamed span { color: var(--mat-text-muted); font-style: italic; }
+@media (max-width: 599px) {
+  .md-people { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
+  .md-person__face { width: 88px; }
+  .md-person-name__row { flex-direction: column; }
+}

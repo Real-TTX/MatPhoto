@@ -16,12 +16,15 @@ public sealed class MenuModel
     public int ImportsWaiting { get; init; }
 
     public bool HasStorages { get; init; }
+
+    /// <summary>The recognition of faces is switched on: the menu shows People.</summary>
+    public bool People { get; init; }
 }
 
 /// <summary>One menu of the switcher at the foot of the menu.</summary>
 public sealed record MenuArea(string Id, string Title, string Icon);
 
-public sealed class MenuService(AppDbContext db, CurrentUser me)
+public sealed class MenuService(AppDbContext db, CurrentUser me, LibrarySettings library)
 {
     private MenuModel? _model;
 
@@ -69,6 +72,7 @@ public sealed class MenuService(AppDbContext db, CurrentUser me)
             CanImport = grants.Any(g => g.IsLibrary && g.Role >= AccessRole.Editor && !g.IsReadOnly),
             ImportsWaiting = await db.ImportSessions.CountAsync(s => s.UserId == userId && s.State == ImportState.Review),
             HasStorages = grants.Any(g => g.IsLibrary),
+            People = library.Current.FacesEnabled,
         };
         return _model;
     }

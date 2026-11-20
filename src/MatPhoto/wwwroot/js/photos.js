@@ -705,6 +705,10 @@ class Viewer {
     this.trashButton.hidden = !d.canEdit;
     this.info.replaceChildren(...[
       el('h2', { class: 'md-viewer__info-title', text: t('Viewer.Info') }),
+      // the people on the photo (when the recognition is on): their faces, a link to all their photos
+      d.people?.length ? el('div', { class: 'md-viewer__people' }, el('h3', { text: t('Viewer.People') }),
+        el('div', { class: 'md-viewer__people-list' }, d.people.map(p => el('a', { class: 'md-viewer__person' + (p.named ? '' : ' is-unnamed'), href: `/People/View/${p.id}` },
+          el('img', { src: `/faces/${p.face}/thumb`, alt: '', loading: 'lazy' }), el('span', { text: p.name }))))) : null,
       el('ul', { class: 'md-facts' }, d.rows.map(r => el('li', { class: 'md-fact' },
         icon(r.icon),
         el('div', { class: 'md-fact__body' },

@@ -18,6 +18,22 @@
 }
 else
 {
+    @if (Model.People.Count > 0)
+    {
+        <section class="md-section" aria-labelledby="explore-people">
+            <h2 class="md-section__title" id="explore-people">@Ui.Icon("users")@L["Explore.People"]<a class="md-section__more" href="/People">@L["People.All"]</a></h2>
+            <div class="md-people md-people--row">
+                @foreach (var p in Model.People)
+                {
+                    <a class="md-person" href="/People/View/@p.Id">
+                        <span class="md-person__face">@if (p.CoverFaceId is { } face) { <img src="/faces/@face/thumb" alt="" loading="lazy" decoding="async" /> } else { @Ui.Icon("user") }</span>
+                        <span class="md-person__name@(p.Name is null ? " is-unnamed" : "")">@(p.Name ?? L["People.WhoIsThis"].Value)</span>
+                        <span class="md-person__meta">@L["People.Photos", p.Photos.ToString("N0")]</span>
+                    </a>
+                }
+            </div>
+        </section>
+    }
     @if (m.Places.Count > 0)
     {
         <section class="md-section" aria-labelledby="explore-places">
@@ -53,8 +69,12 @@ else
             <partial name="_Cards" model="m.Cameras" />
         </section>
     }
-    <section class="md-section" aria-labelledby="explore-people">
-        <h2 class="md-section__title" id="explore-people">@Ui.Icon("users")@L["Explore.People"]</h2>
-        <p class="md-muted">@L["Explore.People.Soon"]</p>
-    </section>
+    @if (!Model.PeopleOn)
+    {
+        <section class="md-section" aria-labelledby="explore-people">
+            <h2 class="md-section__title" id="explore-people">@Ui.Icon("users")@L["Explore.People"]</h2>
+            <p class="md-muted">@L[Model.IsAdmin ? "People.OffAdmin" : "People.OffText"]
+                @if (Model.IsAdmin) { <a href="/Admin/System?tab=people">@L["People.SwitchOn"]</a> }</p>
+        </section>
+    }
 }

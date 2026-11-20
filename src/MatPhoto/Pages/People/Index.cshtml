@@ -1,0 +1,61 @@
+@page "/People"
+@model MatPhoto.Pages.People.IndexModel
+@{
+    ViewData["Title"] = L["People.Title"].Value;
+    ViewData["PageSub"] = L["People.Sub"].Value;
+    ViewData["NavKey"] = "people";
+    ViewData["Width"] = "wide";
+}
+
+@if (!Model.Enabled)
+{
+    <div class="mat-empty mat-empty--framed">
+        <span class="mat-empty__icon">@Ui.Icon("users")</span>
+        <div class="mat-empty__title">@L["People.Off"]</div>
+        <p>@L[Model.IsAdmin ? "People.OffAdmin" : "People.OffText"]</p>
+        @if (Model.IsAdmin)
+        {
+            <a class="mat-btn mat-btn--primary" href="/Admin/System?tab=people">@Ui.Icon("settings")<span>@L["People.SwitchOn"]</span></a>
+        }
+    </div>
+}
+else
+{
+    @if (Model.Progress is { } progress)
+    {
+        <div class="mat-alert mat-alert--info" role="status">@Ui.Icon("sparkles")<div class="mat-alert__body">@L["People.Working", progress.Looked.ToString("N0"), progress.Photos.ToString("N0")]</div></div>
+    }
+    <div class="mat-list">
+        <partial name="_Toolbar" model="Model.Toolbar" />
+
+        @if (Model.Items.Count == 0)
+        {
+            var first = Model.Toolbar.Total == 0;
+            <partial name="_Empty" model="@(new EmptyStateModel("users", L[first ? "People.Empty" : "People.NoMatch"].Value, L[first ? "People.EmptyText" : "Lists.ChangeTools"].Value, first, null, null, Model.Toolbar.UrlReset()))" />
+        }
+        else
+        {
+            <div class="md-people">
+                @foreach (var p in Model.Items)
+                {
+                    <a class="md-person" href="/People/View/@p.Id">
+                        <span class="md-person__face">
+                            @if (p.CoverFaceId is { } face)
+                            {
+                                <img src="/faces/@face/thumb" alt="" loading="lazy" decoding="async" />
+                            }
+                            else
+                            {
+                                @Ui.Icon("user")
+                            }
+                        </span>
+                        <span class="md-person__name@(p.Name is null ? " is-unnamed" : "")">@(p.Name ?? L["People.WhoIsThis"].Value)</span>
+                        <span class="md-person__meta">@L["People.Photos", p.Photos.ToString("N0")]</span>
+                    </a>
+                }
+            </div>
+        }
+
+        <partial name="_Pager" model="Model.Pager" />
+    </div>
+}

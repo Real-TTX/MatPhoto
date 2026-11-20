@@ -27,6 +27,12 @@ public static class LibrarySetup
         services.AddHostedService(sp => sp.GetRequiredService<LibraryScanner>());
         services.AddSingleton<ImportWorker>();
         services.AddHostedService(sp => sp.GetRequiredService<ImportWorker>());
+
+        // the people: the models beside the app (the image downloads them), or where ModelsDirectory says
+        services.AddSingleton(sp => new Faces.FaceEngine(sp.GetRequiredService<IConfiguration>()["ModelsDirectory"] ?? Path.Combine(AppContext.BaseDirectory, "models")));
+        services.AddSingleton<Faces.FaceCrops>();
+        services.AddSingleton<Faces.FaceWorker>();
+        services.AddHostedService(sp => sp.GetRequiredService<Faces.FaceWorker>());
         return services;
     }
 }
@@ -51,6 +57,20 @@ public static class LibraryEndpoints
         {
             var media = await LibraryService.FindAsync(db, me.RequiredId, id, http.RequestAborted);
             return media?.Storage is null ? Results.NotFound() : await OriginalAsync(http, connections, media.Storage, media.Path, media.FileName, media.MimeType, media.Size, media.FileModified, download == true);
+        });
+
+        // the round picture of a face (a person): cut out of the preview, only of photos the person may see
+        app.MapGet("/faces/{faceId:long}/thumb", async (long faceId, HttpContext http, AppDbContext db, CurrentUser me, Faces.FaceCrops crops) =>
+        {
+            var face = await Faces.PeopleService.FaceAsync(db, me.RequiredId, faceId, http.RequestAborted);
+            var data = face is { } f ? await crops.GetAsync(faceId, f.Hash, f.X, f.Y, f.Width, f.Height, http.RequestAborted) : null;
+            if (data is null)
+            {
+                return Results.NotFound();
+            }
+
+            http.Response.Headers.CacheControl = "private, max-age=31536000, immutable";
+            return Results.Bytes(data, "image/jpeg");
         });
 
         // the files of an import (the review page shows them before they are in the library)
@@ -199,7 +219,17 @@ public static class LibraryEndpoints
             var places = await LibraryService.Shown(db, visible).Where(m => m.City != null && EF.Functions.ILike(m.City, like))
                 .GroupBy(m => new { m.CountryCode, m.City, m.Country }).Select(g => new { g.Key.CountryCode, g.Key.City, g.Key.Country, Count = g.Count() })
                 .OrderByDescending(g => g.Count).Take(4).ToListAsync(ct);
+            var people = await Faces.PeopleService.ListAsync(db, me.RequiredId, new Faces.PeopleCriteria(text, "named", "count", true, 1, 4), ct);
             var groups = new List<object>();
+            if (people.Items.Count > 0)
+            {
+                groups.Add(new
+                {
+                    name = Text.T("People.Title"),
+                    items = people.Items.Select(p => new { title = p.Name, text = Text.T("People.Photos", p.Photos), href = $"/People/View/{p.Id}", icon = "user", kind = "person", id = p.Id.ToString(CultureInfo.InvariantCulture) }),
+                });
+            }
+
             if (albums.Items.Count > 0)
             {
                 groups.Add(new
@@ -518,6 +548,7 @@ public static class LibraryEndpoints
             browserCanShow = d.BrowserCanShow,
             albumId = d.AlbumId,
             lists = d.Lists.Select(l => new { id = l.Id, name = l.Name }),
+            people = d.People.Select(p => new { id = p.Id, name = p.Name ?? Text.T("People.Unnamed"), named = p.Name is not null, face = p.FaceId }),
             title = date.ToString("D", culture),
             rows,
         };

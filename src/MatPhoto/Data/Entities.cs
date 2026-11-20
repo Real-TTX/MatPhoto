@@ -364,6 +364,80 @@ public sealed class Media : SoftEntity
     public ThumbState ThumbState { get; set; }
 
     public string? ThumbError { get; set; }
+
+    /// <summary>Whether the faces of the photo were looked for (people); a changed file starts again.</summary>
+    public FaceState FaceState { get; set; }
+}
+
+public enum FaceState : short
+{
+    /// <summary>Not looked for yet (or the file changed).</summary>
+    Pending = 0,
+
+    Done = 1,
+
+    /// <summary>The preview could not be read; looked for again when its thumbnails are made again.</summary>
+    Failed = 2,
+}
+
+/// <summary>
+/// A person whose face is on photos: made by the recognition when several faces look alike (then without a name: "who is this?"), named by a person of the
+/// installation. The faces are linked to it (<see cref="Face.PersonId"/>); every person of the installation sees a person only on the photos they may see.
+/// </summary>
+public sealed class Person : SoftEntity
+{
+    /// <summary>The name; null = not named yet.</summary>
+    public string? Name { get; set; }
+
+    /// <summary>Not shown among the people (someone in the background, a poster).</summary>
+    public bool IsHidden { get; set; }
+
+    /// <summary>The face that shows the person (the clearest one, or the one chosen).</summary>
+    public long? CoverFaceId { get; set; }
+}
+
+/// <summary>
+/// A face found on a photo: where it is (relative to the picture, 0 to 1, so it fits every size of preview), how sure the detector was, and its features (128 numbers
+/// of SFace, of length 1: two faces of the same person have a large dot product).
+/// </summary>
+public sealed class Face : Entity
+{
+    public long MediaId { get; set; }
+
+    public Media? Media { get; set; }
+
+    public long? PersonId { get; set; }
+
+    public Person? Person { get; set; }
+
+    public float X { get; set; }
+
+    public float Y { get; set; }
+
+    public float Width { get; set; }
+
+    public float Height { get; set; }
+
+    public float Score { get; set; }
+
+    public float[] Embedding { get; set; } = [];
+
+    /// <summary>The grouping looked at it (a new face is looked at once; it may still be without a person).</summary>
+    public bool Clustered { get; set; }
+
+    /// <summary>A person said it belongs to nobody worth naming (the person was "forgotten"): never grouped again.</summary>
+    public bool IsIgnored { get; set; }
+
+    /// <summary>A person put it to its person by hand: the grouping never changes it.</summary>
+    public bool IsConfirmed { get; set; }
+}
+
+/// <summary>A person said this face is not this person: the grouping never puts it there again.</summary>
+public sealed class FaceRejection : Entity
+{
+    public long FaceId { get; set; }
+
+    public long PersonId { get; set; }
 }
 
 /// <summary>A photo a person marked as a favourite.</summary>
@@ -656,4 +730,7 @@ public sealed class SystemSetting : Entity
 
     /// <summary>The largest file that may be uploaded (bytes; 0 = no limit).</summary>
     public long MaxUploadBytes { get; set; }
+
+    /// <summary>Faces are looked for and grouped into people (on this server; off until an administrator switches it on: faces are biometric data).</summary>
+    public bool FacesEnabled { get; set; }
 }

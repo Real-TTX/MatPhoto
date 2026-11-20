@@ -34,3 +34,6 @@ node_modules/
 
 # Sample photos of the local stack (made by tools/SampleData)
 /sample-data/
+
+# The models of the face recognition (scripts/models.js; the image downloads them)
+/src/MatPhoto/models/

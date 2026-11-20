@@ -13,6 +13,9 @@ public abstract class AppPageModel : PageModel
 
     public DateOnly Today => Me.Today;
 
+    /// <summary>The person is an administrator (pages show the way to a setting).</summary>
+    public bool IsAdmin => Me.IsAdmin;
+
     protected void Flash(string message) => TempData["Flash"] = message;
 
     protected void FlashError(string message) => TempData["FlashError"] = message;

@@ -71,6 +71,13 @@ public sealed class MediaFacts
         m.MimeType = MimeType;
         m.Size = Size;
         m.FileModified = FileModified;
+
+        // another picture (or its preview came again after it had failed): its faces are looked for again
+        if (m.ContentHash != ContentHash || m.FaceState == FaceState.Failed)
+        {
+            m.FaceState = FaceState.Pending;
+        }
+
         m.ContentHash = ContentHash;
         m.PerceptualHash = PerceptualHash;
         m.Width = Width;

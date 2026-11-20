@@ -204,4 +204,72 @@ public sealed class LibraryDbTests : IAsyncLifetime
         Assert.Equal(ids, items!.Select(i => i.Id));
         Assert.Null(await LibraryService.BucketsAsync(db, ben.Id, new MediaScope("list", listId)));
     }
+
+    [DbFact]
+    public async Task Faces_become_people_a_person_names_joins_and_forgets()
+    {
+        var (storage, anna, ben) = await SetUpAsync();
+        await ScanAsync(storage.Id);
+        var db = _database!.Db;
+        var photos = await db.Media.OrderBy(m => m.Id).Select(m => m.Id).ToListAsync();
+        var random = new Random(7);
+        float[] Near(float[] centre) => Services.Faces.FaceEngine.Normalize(centre.Select(v => v + (float)(random.NextDouble() - 0.5) * 0.04f).ToArray());
+        float[] Somebody() => Services.Faces.FaceEngine.Normalize(Enumerable.Range(0, 128).Select(_ => (float)(random.NextDouble() - 0.5)).ToArray());
+
+        // one person on each of the three photos, another one on each of them too, and a stranger once
+        var max = Somebody();
+        var lena = Somebody();
+        foreach (var photo in photos)
+        {
+            db.Faces.Add(new Face { MediaId = photo, X = 0.1f, Y = 0.1f, Width = 0.2f, Height = 0.2f, Score = 0.9f, Embedding = Near(max) });
+            db.Faces.Add(new Face { MediaId = photo, X = 0.6f, Y = 0.1f, Width = 0.2f, Height = 0.2f, Score = 0.9f, Embedding = Near(lena) });
+        }
+
+        db.Faces.Add(new Face { MediaId = photos[0], X = 0.4f, Y = 0.5f, Width = 0.1f, Height = 0.1f, Score = 0.9f, Embedding = Somebody() });
+        await db.SaveChangesAsync();
+        var worker = ActivatorUtilities.CreateInstance<Services.Faces.FaceWorker>(_services!, new Services.Faces.FaceEngine(Path.Combine(_folder!.Root, "no-models")));
+        await worker.GroupAsync(CancellationToken.None);
+        db.ChangeTracker.Clear();
+
+        // two people without a name; Ben sees none of them (he may not see the storage)
+        var people = await Services.Faces.PeopleService.ListAsync(db, anna.Id, new Services.Faces.PeopleCriteria(null, null, "count", true, 1, 50));
+        Assert.Equal(2, people.Items.Count);
+        Assert.All(people.Items, p => Assert.Null(p.Name));
+        Assert.All(people.Items, p => Assert.Equal(3, p.Photos));
+        Assert.Empty((await Services.Faces.PeopleService.ListAsync(db, ben.Id, new Services.Faces.PeopleCriteria(null, null, "count", true, 1, 50))).Items);
+        var first = people.Items[0].Id;
+        var second = people.Items[1].Id;
+        Assert.Null(await Services.Faces.PeopleService.GetAsync(db, ben.Id, first));
+        Assert.False((await Services.Faces.PeopleService.RenameAsync(db, ben.Id, first, "Max")).Ok);
+
+        // a name; the photos of the person and the search by the name
+        Assert.Equal(first, (await Services.Faces.PeopleService.RenameAsync(db, anna.Id, first, "  Max  ")).Value);
+        Assert.Equal("Max", (await Services.Faces.PeopleService.GetAsync(db, anna.Id, first))!.Name);
+        Assert.Equal(3, (await LibraryService.BucketsAsync(db, anna.Id, new MediaScope("person", first)))!.Sum(b => b.Count));
+        Assert.Equal(3, (await LibraryService.BucketsAsync(db, anna.Id, MediaScope.Parse("search:max")))!.Sum(b => b.Count));
+        Assert.Null(await LibraryService.BucketsAsync(db, ben.Id, new MediaScope("person", first)));
+        var detail = await LibraryService.DetailAsync(db, anna.Id, photos[0]);
+        Assert.Contains(detail!.People, p => p.Name == "Max");
+
+        // the same name for the other person joins them (as if it were found twice)
+        Assert.Equal(first, (await Services.Faces.PeopleService.RenameAsync(db, anna.Id, second, "max")).Value);
+        db.ChangeTracker.Clear();
+        Assert.Equal(6, await db.Faces.CountAsync(f => f.PersonId == first));
+        Assert.Null(await Services.Faces.PeopleService.GetAsync(db, anna.Id, second));
+
+        // "not this person": the face leaves and is not grouped there again
+        var wrong = await db.Faces.Where(f => f.PersonId == first).OrderBy(f => f.Id).Select(f => f.Id).FirstAsync();
+        Assert.Equal(1, await Services.Faces.PeopleService.RejectAsync(db, anna.Id, first, [wrong]));
+        await db.Faces.Where(f => f.Id == wrong).ExecuteUpdateAsync(u => u.SetProperty(f => f.Clustered, false));
+        await worker.GroupAsync(CancellationToken.None);
+        db.ChangeTracker.Clear();
+        Assert.Null((await db.Faces.FirstAsync(f => f.Id == wrong)).PersonId);
+
+        // forgotten: no person, the faces are not grouped again
+        Assert.True(await Services.Faces.PeopleService.ForgetAsync(db, anna.Id, first));
+        await worker.GroupAsync(CancellationToken.None);
+        db.ChangeTracker.Clear();
+        Assert.Empty((await Services.Faces.PeopleService.ListAsync(db, anna.Id, new Services.Faces.PeopleCriteria(null, null, "count", true, 1, 50))).Items);
+        Assert.Equal(5, await db.Faces.CountAsync(f => f.IsIgnored));
+    }
 }

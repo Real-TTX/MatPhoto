@@ -16,3 +16,5 @@ tests/
 scripts/
 **/*.user
 **/node_modules/
+src/MatPhoto/models/
+sample-data/

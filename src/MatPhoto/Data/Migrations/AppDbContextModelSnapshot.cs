@@ -274,6 +274,108 @@ namespace MatPhoto.Data.Migrations
                     b.ToTable("DuplicateDismissal", (string)null);
                 });
 
+            modelBuilder.Entity("MatPhoto.Data.Face", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Clustered")
+                        .HasColumnType("boolean");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreateUserId")
+                        .HasColumnType("bigint");
+
+                    b.PrimitiveCollection<float[]>("Embedding")
+                        .IsRequired()
+                        .HasColumnType("real[]");
+
+                    b.Property<float>("Height")
+                        .HasColumnType("real");
+
+                    b.Property<bool>("IsConfirmed")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsIgnored")
+                        .HasColumnType("boolean");
+
+                    b.Property<long>("MediaId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long?>("PersonId")
+                        .HasColumnType("bigint");
+
+                    b.Property<float>("Score")
+                        .HasColumnType("real");
+
+                    b.Property<DateTime>("UpdateDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("UpdateUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<float>("Width")
+                        .HasColumnType("real");
+
+                    b.Property<float>("X")
+                        .HasColumnType("real");
+
+                    b.Property<float>("Y")
+                        .HasColumnType("real");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Clustered")
+                        .HasFilter("\"Clustered\" = false");
+
+                    b.HasIndex("MediaId");
+
+                    b.HasIndex("PersonId");
+
+                    b.ToTable("Face", (string)null);
+                });
+
+            modelBuilder.Entity("MatPhoto.Data.FaceRejection", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreateUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("FaceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<long>("PersonId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("UpdateDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("UpdateUserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("PersonId");
+
+                    b.HasIndex("FaceId", "PersonId")
+                        .IsUnique();
+
+                    b.ToTable("FaceRejection", (string)null);
+                });
+
             modelBuilder.Entity("MatPhoto.Data.ImportGroup", b =>
                 {
                     b.Property<long>("Id")
@@ -591,6 +693,9 @@ namespace MatPhoto.Data.Migrations
                     b.Property<double?>("FNumber")
                         .HasColumnType("double precision");
 
+                    b.Property<short>("FaceState")
+                        .HasColumnType("smallint");
+
                     b.Property<DateTime>("FileModified")
                         .HasColumnType("timestamp with time zone");
 
@@ -683,6 +788,8 @@ namespace MatPhoto.Data.Migrations
 
                     b.HasIndex("ContentHash");
 
+                    b.HasIndex("FaceState");
+
                     b.HasIndex("PerceptualHash");
 
                     b.HasIndex("SortDate");
@@ -732,6 +839,46 @@ namespace MatPhoto.Data.Migrations
                         .IsUnique();
 
                     b.ToTable("MediaFavorite", (string)null);
+                });
+
+            modelBuilder.Entity("MatPhoto.Data.Person", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("CoverFaceId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreateUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("IsHidden")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("Name")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTime>("UpdateDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<short>("UpdateState")
+                        .HasColumnType("smallint");
+
+                    b.Property<long?>("UpdateUserId")
+                        .HasColumnType("bigint");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name");
+
+                    b.ToTable("Person", (string)null);
                 });
 
             modelBuilder.Entity("MatPhoto.Data.Storage", b =>
@@ -910,6 +1057,9 @@ namespace MatPhoto.Data.Migrations
 
                     b.Property<long?>("CreateUserId")
                         .HasColumnType("bigint");
+
+                    b.Property<bool>("FacesEnabled")
+                        .HasColumnType("boolean");
 
                     b.Property<int>("ImportDistanceKm")
                         .HasColumnType("integer");
@@ -1147,6 +1297,24 @@ namespace MatPhoto.Data.Migrations
                     b.Navigation("Collection");
 
                     b.Navigation("Media");
+                });
+
+            modelBuilder.Entity("MatPhoto.Data.Face", b =>
+                {
+                    b.HasOne("MatPhoto.Data.Media", "Media")
+                        .WithMany()
+                        .HasForeignKey("MediaId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("MatPhoto.Data.Person", "Person")
+                        .WithMany()
+                        .HasForeignKey("PersonId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("Media");
+
+                    b.Navigation("Person");
                 });
 
             modelBuilder.Entity("MatPhoto.Data.ImportGroup", b =>

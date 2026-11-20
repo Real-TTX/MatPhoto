@@ -31,6 +31,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, Current
 
     public DbSet<DuplicateDismissal> DuplicateDismissals => Set<DuplicateDismissal>();
 
+    public DbSet<Person> People => Set<Person>();
+
+    public DbSet<Face> Faces => Set<Face>();
+
+    public DbSet<FaceRejection> FaceRejections => Set<FaceRejection>();
+
     public DbSet<ImportSession> ImportSessions => Set<ImportSession>();
 
     public DbSet<ImportGroup> ImportGroups => Set<ImportGroup>();
@@ -124,6 +130,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, Current
             e.HasIndex(x => x.PerceptualHash);
             e.HasIndex(x => new { x.CountryCode, x.City });
             e.HasIndex(x => x.ThumbState);
+            e.HasIndex(x => x.FaceState);
             e.HasOne(x => x.Storage).WithMany().HasForeignKey(x => x.StorageId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Album).WithMany().HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.Cascade);
             e.Property(x => x.Path).HasMaxLength(2000);
@@ -176,6 +183,31 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, Current
         {
             e.ToTable("DuplicateDismissal");
             e.HasIndex(x => new { x.FirstMediaId, x.SecondMediaId }).IsUnique();
+        });
+
+        b.Entity<Person>(e =>
+        {
+            e.ToTable("Person");
+            e.Property(x => x.Name).HasMaxLength(200);
+            e.HasIndex(x => x.Name);
+            e.HasQueryFilter(x => x.UpdateState != SoftEntity.Deleted);
+        });
+
+        b.Entity<Face>(e =>
+        {
+            e.ToTable("Face");
+            e.HasIndex(x => x.MediaId);
+            e.HasIndex(x => x.PersonId);
+            e.HasIndex(x => x.Clustered).HasFilter("\"Clustered\" = false");
+            e.HasOne(x => x.Media).WithMany().HasForeignKey(x => x.MediaId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Person).WithMany().HasForeignKey(x => x.PersonId).OnDelete(DeleteBehavior.SetNull);
+        });
+
+        b.Entity<FaceRejection>(e =>
+        {
+            e.ToTable("FaceRejection");
+            e.HasIndex(x => new { x.FaceId, x.PersonId }).IsUnique();
+            e.HasIndex(x => x.PersonId);
         });
 
         b.Entity<ImportSession>(e =>

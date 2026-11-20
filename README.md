@@ -16,6 +16,7 @@ PostgreSQL, part of the Mat family.
 | **The grid** | Every photo and video month by month and day by day in justified rows, endless scrolling (only what is near the screen is in the page), a year bar, selection of ranges and whole days. |
 | **The viewer** | Full screen on black, the next photos loaded ahead, keys and swipes, zoom, slideshow, videos with seeking, Live Photos, the info (date, camera, exposure, place, album). |
 | **Thumbnails and cache** | Made once with ImageMagick (JPEG, HEIC, PNG, WebP, AVIF, TIFF, RAW) and ffmpeg (videos), kept in the data volume or a folder of a storage (your NAS), keyed by the content. |
+| **People** | Faces are found and grouped into people on the server itself (YuNet and SFace of the OpenCV model zoo, ONNX Runtime on the CPU – no cloud, no graphics card): name them ("who is this?"), join two groups of the same person, take a face away, search by name; the viewer shows who is on a photo. Off until an administrator switches it on (*System → People*). |
 | **Explore** | Automatic albums: places (found offline from the positions), videos, screenshots, selfies, panoramas, Live Photos, animations, RAW, years, cameras. |
 | **Duplicates** | The same file twice and similar pictures (another size, a burst), side by side: keep one, the rest goes into the trash folder. |
 | **Smart import** | Upload files or whole folders, or name a folder of a storage (the inbox your phone syncs to): dates, places and duplicates are recognised, albums suggested by time, place and folder, then copied or moved. |
@@ -54,6 +55,7 @@ a folder of a storage), *→ Import* how new albums are named and grouped.
 dotnet build MatPhoto.slnx                                  # 0 warnings
 dotnet run --project tools/SampleData -- sample-data        # 48 sample photos with EXIF, GPS, screenshots, duplicates, an inbox
 ./scripts/redeploy.ps1                                      # rebuilds and starts the local stack (-Clean: empty volumes)
+node scripts/models.js                                     # the models of the face recognition (the image brings them itself)
 MATPHOTO_TEST_DB="Host=localhost;Port=4832;Username=matphoto;Password=matphoto;Database=postgres" dotnet test
 ```
 
@@ -68,11 +70,11 @@ connected by **Mattiverse** or by their variables), the launcher *Photos* with q
 
 ## Not yet
 
-- People (faces) – planned, on the server, without a cloud.
 - Transcoding of videos the browser cannot play (HEVC in some browsers, MKV, AVI): they are downloaded instead.
 - Sharing albums by link with people without an account.
 
 ## Credits
 
-Places: [GeoNames](https://www.geonames.org) (CC BY 4.0), towns of 15,000 people or more, read offline. ImageMagick (Magick.NET), MetadataExtractor, ffmpeg,
+Places: [GeoNames](https://www.geonames.org) (CC BY 4.0), towns of 15,000 people or more, read offline. Faces: [YuNet](https://github.com/opencv/opencv_zoo/tree/main/models/face_detection_yunet) (MIT) and
+[SFace](https://github.com/opencv/opencv_zoo/tree/main/models/face_recognition_sface) (Apache 2.0) of the OpenCV model zoo, run with ONNX Runtime. ImageMagick (Magick.NET), MetadataExtractor, ffmpeg,
 SMBLibrary, SSH.NET, FluentFTP, MatUi.

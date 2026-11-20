@@ -42,7 +42,8 @@ public sealed record SystemSettings(
     long? ImportStorageId,
     string ImportFolder,
     int SimilarThreshold,
-    long MaxUploadBytes);
+    long MaxUploadBytes,
+    bool FacesEnabled);
 
 /// <summary>What the housekeeping removed.</summary>
 public sealed record CleanUpResult(int Sessions, int Imports, int Files);
@@ -136,7 +137,7 @@ public sealed class InstanceService(AppDbContext db, AccountService accounts, Ma
     {
         var s = await accounts.SettingsAsync();
         return new SystemSettings(s.RegistrationOpen, PublicUrlOf(s, platform), platform.AppPublicUrl is not null, s.CacheStorageId, s.CacheFolder, s.ThumbnailHeight, s.PreviewSize,
-            s.ThumbnailQuality, s.AlbumDateFormat, s.ImportGapHours, s.ImportDistanceKm, s.ImportStorageId, s.ImportFolder, s.SimilarThreshold, s.MaxUploadBytes);
+            s.ThumbnailQuality, s.AlbumDateFormat, s.ImportGapHours, s.ImportDistanceKm, s.ImportStorageId, s.ImportFolder, s.SimilarThreshold, s.MaxUploadBytes, s.FacesEnabled);
     }
 
     /// <summary>
@@ -250,6 +251,7 @@ public sealed class InstanceService(AppDbContext db, AccountService accounts, Ma
         s.ImportFolder = importFolder ?? s.ImportFolder;
         s.SimilarThreshold = change.SimilarThreshold ?? s.SimilarThreshold;
         s.MaxUploadBytes = change.MaxUploadBytes ?? s.MaxUploadBytes;
+        s.FacesEnabled = change.FacesEnabled ?? s.FacesEnabled;
         await db.SaveChangesAsync();
         library.Reload(s);
 
@@ -336,4 +338,5 @@ public sealed record SettingsChange(
     long? ImportStorageId = null,
     string? ImportFolder = null,
     int? SimilarThreshold = null,
-    long? MaxUploadBytes = null);
+    long? MaxUploadBytes = null,
+    bool? FacesEnabled = null);

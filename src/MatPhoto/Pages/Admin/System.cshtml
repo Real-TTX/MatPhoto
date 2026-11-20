@@ -64,6 +64,40 @@
                     </div>
                 </div>
             }
+            else if (Model.Tab == "people" && Model.People is { } p)
+            {
+                <div class="mat-card">
+                    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("users")@L["System.People"]</h2></div>
+                    <div class="mat-card__body mat-form">
+                        <md-field name="FacesEnabled" kind="switch" label="@L["System.People.Enabled"]" value="@Model.FacesEnabled.ToString()" hint="@L["System.People.Enabled.Hint"]" />
+                        <div class="mat-alert mat-alert--info" role="note">@Ui.Icon("shield")<div class="mat-alert__body">@L["System.People.Privacy"]</div></div>
+                        @if (!p.ModelsThere)
+                        {
+                            <div class="mat-alert mat-alert--warning" role="note">@Ui.Icon("alert")<div class="mat-alert__body">@L["System.People.NoModels"]</div></div>
+                        }
+                    </div>
+                </div>
+                <div class="mat-card">
+                    <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("sparkles")@L["System.People.State"]</h2></div>
+                    <div class="mat-card__body">
+                        @{ var percent = p.Photos == 0 ? 100 : (int)Math.Round(100.0 * (p.Looked + p.Failed) / p.Photos); }
+                        <div class="mat-meter" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="@percent"><span class="mat-meter__fill" style="--mat-meter: @(percent)%"></span></div>
+                        <dl class="mat-kv md-mt">
+                            <dt>@L["System.People.Looked"]</dt><dd>@L["System.People.LookedOf", (p.Looked + p.Failed).ToString("N0"), p.Photos.ToString("N0")]</dd>
+                            <dt>@L["System.People.Faces"]</dt><dd>@p.Faces.ToString("N0")</dd>
+                            <dt>@L["People.Title"]</dt><dd>@L["System.People.Named", p.People.ToString("N0"), p.Named.ToString("N0")]</dd>
+                            @if (p.Failed > 0)
+                            {
+                                <dt>@L["System.Failed"]</dt><dd>@p.Failed.ToString("N0")</dd>
+                            }
+                        </dl>
+                        @if (p.Enabled && p.Looked + p.Failed < p.Photos)
+                        {
+                            <p class="mat-hint">@L["System.People.Running"]</p>
+                        }
+                    </div>
+                </div>
+            }
             else
             {
                 <div class="mat-card">
@@ -77,6 +111,12 @@
             }
             <md-buttons save="@L["Common.Save"]" back="/Photos" />
         </form>
+        @if (Model.Tab == "people" && Model.People is { } learnt && (learnt.Faces > 0 || learnt.People > 0))
+        {
+            <form method="post" asp-page-handler="DeleteFaces" class="md-mt">
+                <button type="submit" class="mat-btn mat-btn--danger" data-confirm="@L["System.People.DeleteConfirm"]" data-confirm-ok="@L["System.People.Delete"]" data-confirm-danger>@Ui.Icon("trash")<span>@L["System.People.Delete"]</span></button>
+            </form>
+        }
         @if (Model.Tab == "general")
         {
             <form method="post" asp-page-handler="CleanUp" class="md-mt">

@@ -1,0 +1,43 @@
+@page "/People/Edit/{id:long}"
+@model MatPhoto.Pages.People.EditModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["NavKey"] = "people";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["People.Title"].Value, "/People"), (Model.Heading, $"/People/View/{Model.Id}"), (L["Common.Edit"].Value, null) };
+}
+
+<form class="mat-form" method="post" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("user")@L["People.Person"]</h2></div>
+        <div class="mat-card__body mat-form">
+            <md-field name="Name" label="@L["Common.Name"]" value="@Model.Name" maxlength="200" optional autocomplete="off" hint="@L["People.NameHint"]" />
+            <md-field name="Hidden" kind="switch" label="@L["People.HideField"]" value="@Model.Hidden.ToString()" hint="@L["People.HideHint"]" />
+            <md-field name="MergeInto" kind="select" label="@L["People.Merge"]" value="@Model.MergeInto" options="Model.MergeChoices" hint="@L["People.MergeHint"]" />
+        </div>
+    </div>
+
+    <div class="mat-card">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("users")@L["People.Faces", Model.Faces.Count]</h2></div>
+        <div class="mat-card__body">
+            <p class="mat-hint">@L["People.FacesHint"]</p>
+            <div class="md-faces">
+                @foreach (var f in Model.Faces)
+                {
+                    var cover = Model.Cover == f.Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                    <div class="md-face">
+                        <a class="md-face__img" href="/Photos#m@(f.MediaId)" target="_blank" rel="noopener" aria-label="@L["People.OpenPhoto"]"><img src="/faces/@f.Id/thumb" alt="" loading="lazy" decoding="async" /></a>
+                        <label class="md-face__opt md-face__opt--cover" data-tip="@L["People.CoverHint"]">
+                            <input type="radio" name="Cover" value="@f.Id" checked="@cover" /><span>@L["People.Cover"]</span>
+                        </label>
+                        <label class="md-face__opt md-face__opt--not">
+                            <input type="checkbox" name="NotThem" value="@f.Id" /><span>@L["People.NotThem"]</span>
+                        </label>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <md-buttons save="@L["Common.Save"]" back="@($"/People/View/{Model.Id}")" delete-handler="Delete" delete-label="@L["People.Forget"]" delete-confirm="@L["People.ForgetConfirm", Model.Heading]" />
+</form>

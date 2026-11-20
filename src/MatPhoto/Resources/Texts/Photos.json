@@ -45,7 +45,6 @@
   "Explore.Years": { "en": "Years", "de": "Jahre" },
   "Explore.Cameras": { "en": "Cameras", "de": "Kameras" },
   "Explore.People": { "en": "People", "de": "Personen" },
-  "Explore.People.Soon": { "en": "Faces are not recognised yet: this comes with a later version (on your server, without a cloud).", "de": "Gesichter werden noch nicht erkannt: Das kommt mit einer späteren Version (auf deinem Server, ohne Cloud)." },
   "Explore.Count": { "en": "{0} items", "de": "{0} Elemente" },
   "Explore.Empty": { "en": "Nothing to explore yet", "de": "Noch nichts zu entdecken" },
   "Explore.EmptyText": { "en": "As soon as photos are read, places, types and years appear here.", "de": "Sobald Fotos gelesen sind, erscheinen hier Orte, Arten und Jahre." },

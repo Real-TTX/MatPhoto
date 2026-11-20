@@ -51,7 +51,8 @@ public sealed record MediaDetail(
     bool CanEdit,
     bool Favorite,
     IReadOnlyList<(long Id, string Name)> Lists,
-    bool BrowserCanShow);
+    bool BrowserCanShow,
+    IReadOnlyList<Faces.PhotoPerson> People);
 
 /// <summary>A card of Explore: an automatic album with its number of photos and the photo on its cover.</summary>
 public sealed record ExploreCard(string Scope, string Title, string? Subtitle, int Count, long? CoverId, string? CoverHash, string Icon);
@@ -90,6 +91,11 @@ public static class LibraryService
                 return query.Where(m => db.CollectionItems.Any(i => i.CollectionId == scope.Id && i.MediaId == m.Id));
             case "favorites":
                 return query.Where(m => db.Favorites.Any(f => f.UserId == userId && f.MediaId == m.Id));
+            case "person":
+                // a person exists for the viewer only on the photos they may see
+                var personId = scope.Id ?? 0;
+                var photos = query.Where(m => db.Faces.Any(f => f.MediaId == m.Id && f.PersonId == personId && !f.IsIgnored));
+                return await photos.AnyAsync(ct) ? photos : null;
             case "videos":
                 return query.Where(m => m.Type == MediaType.Video);
             case "screenshots":
@@ -117,7 +123,7 @@ public static class LibraryService
                 var year = (int)(scope.Id ?? 0);
                 return query.Where(m => m.SortDate.Year == year);
             case "search":
-                return Search(query, scope.Value ?? string.Empty);
+                return Search(db, query, scope.Value ?? string.Empty);
             default:
                 return query;
         }
@@ -201,7 +207,7 @@ public static class LibraryService
         return new MediaDetail(m.Id, m.FileName, m.Path, m.Type, m.Traits, m.MimeType, m.Size, m.Width, m.Height, m.TakenDate, m.DateSource, m.SortDate, m.CameraMake, m.CameraModel,
             m.LensModel, m.FNumber, m.ExposureTime, m.Iso, m.FocalLength, m.Latitude, m.Longitude, m.Altitude, m.City, m.Region, m.Country, m.CountryCode, m.DurationMs, m.VideoCodec,
             m.LiveVideoId, m.ContentHash, m.ThumbState == ThumbState.Ready, m.AlbumId, m.Album?.Name ?? string.Empty, m.StorageId, m.Storage?.Name ?? string.Empty, canEdit, favorite,
-            lists.Select(l => (l.CollectionId, l.Name)).ToList(), format?.BrowserCanShow ?? false);
+            lists.Select(l => (l.CollectionId, l.Name)).ToList(), format?.BrowserCanShow ?? false, await Faces.PeopleService.OnPhotoAsync(db, mediaId, ct));
     }
 
     /// <summary>The record of a photo the person may see (to read its file or its thumbnail); null otherwise.</summary>
@@ -325,9 +331,9 @@ public static class LibraryService
 
     /// <summary>
     /// The search: every word must be found (a year, "video", "screenshot", "favourite" are understood); a word is looked for in the name of the file, of the album, the
-    /// place and the camera.
+    /// place, the camera and the people on the photo.
     /// </summary>
-    internal static IQueryable<Media> Search(IQueryable<Media> query, string text)
+    internal static IQueryable<Media> Search(AppDbContext db, IQueryable<Media> query, string text)
     {
         foreach (var raw in text.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Take(8))
         {
@@ -358,7 +364,8 @@ public static class LibraryService
 
             var like = "%" + word.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_") + "%";
             query = query.Where(m => EF.Functions.ILike(m.FileName, like) || EF.Functions.ILike(m.Album!.Name, like) || EF.Functions.ILike(m.City ?? string.Empty, like)
-                || EF.Functions.ILike(m.Country ?? string.Empty, like) || EF.Functions.ILike(m.Region ?? string.Empty, like) || EF.Functions.ILike(m.CameraModel ?? string.Empty, like));
+                || EF.Functions.ILike(m.Country ?? string.Empty, like) || EF.Functions.ILike(m.Region ?? string.Empty, like) || EF.Functions.ILike(m.CameraModel ?? string.Empty, like)
+                || db.Faces.Any(f => f.MediaId == m.Id && !f.IsIgnored && f.Person!.Name != null && EF.Functions.ILike(f.Person.Name, like)));
         }
 
         return query;
