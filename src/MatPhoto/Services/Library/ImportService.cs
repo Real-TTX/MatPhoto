@@ -13,7 +13,7 @@ public sealed record ImportGroupView(long Id, int Position, string Name, DateTim
 
 public sealed record ImportView(long Id, Guid Token, ImportSource Source, string? SourceName, string? SourcePath, bool MoveFiles, ImportState State, long? TargetStorageId, string TargetFolder,
     int TotalCount, int DoneCount, int ImportedCount, int SkippedCount, int FailedCount, string? Message, DateTime CreateDate, DateTime? FinishedDate, IReadOnlyList<ImportGroupView> Groups,
-    IReadOnlyList<ImportItemView> Duplicates, IReadOnlyList<ImportItemView> Unreadable);
+    IReadOnlyList<ImportItemView> Duplicates, IReadOnlyList<ImportItemView> Unreadable, bool InPlace, int Stayed);
 
 public sealed record ImportRow(Guid Token, ImportSource Source, string? SourceName, ImportState State, int TotalCount, int ImportedCount, int SkippedCount, int FailedCount, DateTime CreateDate,
     DateTime? FinishedDate);
@@ -71,12 +71,13 @@ public static class ImportService
             return Outcome<Guid>.Fail(Text.T("Import.Error.Folder"));
         }
 
+        // a library sorted in place: the albums go to its top, not into the import folder of the settings
         var settings = await SettingsStore.LoadAsync(db, ct);
+        var target = settings.ImportStorageId ?? (found.Value.Storage.IsLibrary && found.Value.Role >= AccessRole.Editor ? storageId : null);
         var session = db.ImportSessions.Add(new ImportSession
         {
             UserId = userId, Source = ImportSource.Storage, SourceStorageId = storageId, SourcePath = folder, MoveFiles = move && !found.Value.Storage.IsReadOnly,
-            State = ImportState.Analyzing, TargetStorageId = settings.ImportStorageId ?? (found.Value.Storage.IsLibrary && found.Value.Role >= AccessRole.Editor ? storageId : null),
-            TargetFolder = settings.ImportFolder,
+            State = ImportState.Analyzing, TargetStorageId = target, TargetFolder = target == storageId ? string.Empty : settings.ImportFolder,
         }).Entity;
         await db.SaveChangesAsync(ct);
         return Outcome<Guid>.Success(session.Token);
@@ -160,12 +161,21 @@ public static class ImportService
         var items = await db.ImportItems.AsNoTracking().Where(i => i.ImportSessionId == s.Id).OrderBy(i => i.TakenDate).ThenBy(i => i.FileName).ToListAsync(ct);
         var groups = await db.ImportGroups.AsNoTracking().Where(g => g.ImportSessionId == s.Id).OrderBy(g => g.Position).ToListAsync(ct);
         var byGroup = items.Where(i => i.ImportGroupId != null).ToLookup(i => i.ImportGroupId!.Value);
-        return new ImportView(s.Id, s.Token, s.Source, sourceName, s.SourcePath, s.MoveFiles, s.State, s.TargetStorageId, s.TargetFolder, s.TotalCount, s.DoneCount, s.ImportedCount,
+        var inPlace = IsInPlace(s);
+        return new ImportView(s.Id, s.Token, s.Source, sourceName, s.SourcePath, s.MoveFiles || inPlace, s.State, s.TargetStorageId, s.TargetFolder, s.TotalCount, s.DoneCount, s.ImportedCount,
             s.SkippedCount, s.FailedCount, s.Message, s.CreateDate, s.FinishedDate,
             groups.Select(g => new ImportGroupView(g.Id, g.Position, g.Name, g.StartDate, g.EndDate, g.Place, g.Reason, g.Include, g.ExistingAlbumId, byGroup[g.Id].Select(View).ToList())).ToList(),
             items.Where(i => i.DuplicateOfMediaId != null || i.DuplicateOfItemId != null).Select(View).ToList(),
-            items.Where(i => i.ImportGroupId == null && i.DuplicateOfMediaId == null && i.DuplicateOfItemId == null && i.State is ImportItemState.Failed).Select(View).ToList());
+            items.Where(i => i.ImportGroupId == null && i.DuplicateOfMediaId == null && i.DuplicateOfItemId == null && i.State is ImportItemState.Failed).Select(View).ToList(),
+            inPlace, inPlace ? items.Count(i => i.State == ImportItemState.Imported && i.TargetPath == i.SourcePath) : 0);
     }
+
+    /// <summary>
+    /// Whether an import sorts a storage in place: a folder of a library imported into the same library (a NAS connected anew). The files are moved there, never
+    /// copied (that would put every photo twice into the library); a file in its album already stays, the folders left empty go into the trash.
+    /// </summary>
+    public static bool IsInPlace(ImportSession session)
+        => session.Source == ImportSource.Storage && session.SourceStorageId is { } source && session.TargetStorageId == source;
 
     /// <summary>The content hash of a file of an import of the person (its thumbnail and preview in the cache), or null.</summary>
     public static async Task<string?> ItemHashAsync(AppDbContext db, long userId, Guid token, long itemId, CancellationToken ct = default)

@@ -28,7 +28,13 @@ public sealed class EditModel(AppDbContext db) : AppPageModel
 
     [BindProperty] public List<long> NotThem { get; set; } = [];
 
+    /// <summary>Where the ticked faces go: a person's name (a new one makes a person); empty: they only leave this person.</summary>
+    [BindProperty] public string MoveTo { get; set; } = string.Empty;
+
     public PersonDetail Person { get; private set; } = null!;
+
+    /// <summary>The names of the other people (the suggestions of <see cref="MoveTo"/>).</summary>
+    public IReadOnlyList<string> Names { get; private set; } = [];
 
     public IReadOnlyList<PersonFace> Faces { get; private set; } = [];
 
@@ -57,6 +63,28 @@ public sealed class EditModel(AppDbContext db) : AppPageModel
             return NotFound();
         }
 
+        // the ticked faces go to the person named, or only leave this one
+        string? message = null;
+        if (NotThem.Count > 0 && PeopleService.Clean(MoveTo) is { } other)
+        {
+            var mine = Faces.Select(f => f.Id).ToHashSet();
+            var moved = await PeopleService.AssignAsync(db, UserId, NotThem.Where(mine.Contains).ToList(), other, ct);
+            if (!moved.Ok)
+            {
+                return NotFound();
+            }
+
+            if (await PeopleService.GetAsync(db, UserId, Id, ct) is null)
+            {
+                // every face went: this person is the other one now
+                Flash(Text.T("People.Moved", NotThem.Count, other));
+                return LocalRedirect($"/People/View/{moved.Value}");
+            }
+
+            message = Text.T("People.Moved", NotThem.Count, other);
+            NotThem = [];
+        }
+
         var removed = await PeopleService.RejectAsync(db, UserId, Id, NotThem, ct);
         if (long.TryParse(Cover, NumberStyles.None, CultureInfo.InvariantCulture, out var cover) && !NotThem.Contains(cover))
         {
@@ -70,7 +98,7 @@ public sealed class EditModel(AppDbContext db) : AppPageModel
             return NotFound();
         }
 
-        Flash(removed > 0 ? Text.T("People.SavedRemoved", removed) : Text.T("Common.Saved"));
+        Flash(message ?? (removed > 0 ? Text.T("People.SavedRemoved", removed) : Text.T("Common.Saved")));
         return LocalRedirect($"/People/View/{outcome.Value}");
     }
 
@@ -95,6 +123,7 @@ public sealed class EditModel(AppDbContext db) : AppPageModel
 
         Person = person;
         Faces = await PeopleService.FacesAsync(db, UserId, Id, FacesShown, ct);
+        Names = (await PeopleService.NamesAsync(db, UserId, ct)).Where(n => n.Id != Id).Select(n => n.Name).ToList();
         var others = await PeopleService.ListAsync(db, UserId, new PeopleCriteria(null, null, "name", false, 1, 500), ct);
         MergeChoices = [new(string.Empty, Text.T("People.MergeNone")),
             .. others.Items.Where(o => o.Id != Id).Select(o => new Choice(o.Id.ToString(CultureInfo.InvariantCulture),

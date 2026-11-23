@@ -152,6 +152,24 @@ public static class LibraryEndpoints
             }, Json);
         });
 
+        // ---- the faces of a photo (the viewer: "who is this?") -----------------------------------------------------------------
+        live.MapGet("/people/names", async (AppDbContext db, CurrentUser me, CancellationToken ct) =>
+        {
+            var names = await Faces.PeopleService.NamesAsync(db, me.RequiredId, ct);
+            return Results.Json(new { names = names.Select(n => n.Name) }, Json);
+        });
+
+        live.MapPost("/faces/{faceId:long}/name", async (long faceId, NameRequest body, AppDbContext db, CurrentUser me, CancellationToken ct) =>
+        {
+            var outcome = await Faces.PeopleService.AssignAsync(db, me.RequiredId, [faceId], body.Name, ct);
+            return outcome.NotAllowed ? Results.NotFound()
+                : outcome.Ok ? Results.Json(new { person = outcome.Value, message = Text.T("People.Named", Faces.PeopleService.Clean(body.Name)!) }, Json)
+                : Problem(outcome.Error);
+        });
+
+        live.MapPost("/faces/{faceId:long}/ignore", async (long faceId, AppDbContext db, CurrentUser me, CancellationToken ct)
+            => await Faces.PeopleService.IgnoreAsync(db, me.RequiredId, faceId, ct) ? Results.Json(new { ok = true, message = Text.T("People.Ignored") }, Json) : Results.NotFound());
+
         live.MapGet("/lists", async (AppDbContext db, CurrentUser me, CancellationToken ct) =>
         {
             var lists = await CollectionService.TargetsAsync(db, me.RequiredId, ct);
@@ -548,7 +566,14 @@ public static class LibraryEndpoints
             browserCanShow = d.BrowserCanShow,
             albumId = d.AlbumId,
             lists = d.Lists.Select(l => new { id = l.Id, name = l.Name }),
-            people = d.People.Select(p => new { id = p.Id, name = p.Name ?? Text.T("People.Unnamed"), named = p.Name is not null, face = p.FaceId }),
+            people = d.People.Select(p => new
+            {
+                id = p.Id,
+                name = p.Name ?? (p.Id is null ? Text.T("People.WhoIsThis") : Text.T("People.Unnamed")),
+                current = p.Name ?? string.Empty,
+                named = p.Name is not null,
+                face = p.FaceId,
+            }),
             title = date.ToString("D", culture),
             rows,
         };

@@ -175,7 +175,7 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
                 member.ImportGroupId = group.Id;
             }
 
-            group.ExistingAlbumId = await MatchingAlbumAsync(db, session, group, ct);
+            group.ExistingAlbumId = await MatchingAlbumAsync(db, session, group, members, ct);
         }
 
         session.TotalCount = items.Count;
@@ -224,8 +224,9 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
 
     /// <summary>
     /// An album of the target storage for the group: of a folder the album of the same name, else the album with the same date (only when exactly one has it).
+    /// A storage sorted in place keeps the folders that are albums already: the group of such a folder goes into it, nothing of it moves.
     /// </summary>
-    private static async Task<long?> MatchingAlbumAsync(AppDbContext db, ImportSession session, ImportGroup group, CancellationToken ct)
+    private static async Task<long?> MatchingAlbumAsync(AppDbContext db, ImportSession session, ImportGroup group, IReadOnlyList<ImportItem> members, CancellationToken ct)
     {
         if (session.TargetStorageId is not { } target || group.Reason is "screenshots" or "nodate")
         {
@@ -234,6 +235,13 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
 
         if (group.Reason == "folder")
         {
+            if (ImportService.IsInPlace(session) && members.Select(m => AlbumNames.AlbumFolderOf(m.SourceFolder)).Distinct(StringComparer.Ordinal).ToList() is [{ } path]
+                && await db.Albums.Where(a => a.StorageId == target && a.Path == path).Select(a => new { a.Id, a.Name }).FirstOrDefaultAsync(ct) is { } own)
+            {
+                group.Name = own.Name;
+                return own.Id;
+            }
+
             var name = group.Name.ToLower();
             var named = await db.Albums.Where(a => a.StorageId == target && a.Path != string.Empty && a.Name.ToLower() == name).Select(a => a.Id).Take(2).ToListAsync(ct);
             return named.Count == 1 ? named[0] : null;
@@ -266,6 +274,7 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
         var staging = ImportService.StagingFolder(_data, session.Token);
         var groups = await db.ImportGroups.Where(g => g.ImportSessionId == session.Id && g.Include).OrderBy(g => g.Position).ToListAsync(ct);
         var targets = new HashSet<long>();
+        var left = new HashSet<string>(StringComparer.Ordinal);
         var options = settings.Current;
         foreach (var group in groups)
         {
@@ -298,20 +307,30 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
             var target = connections.Create(storage);
             await StorageFolders.EnsureAsync(target, folder, ct);
             targets.Add(storage.Id);
+
+            // into the storage the files come from: they are sorted there (moved, a copy would put every photo twice into the library)
+            var sameStorage = sourceStorage is not null && sourceStorage.Id == storage.Id;
             var items = await db.ImportItems.Where(i => i.ImportGroupId == group.Id && i.State == ImportItemState.Ready).OrderBy(i => i.TakenDate).ToListAsync(ct);
             foreach (var item in items)
             {
                 ct.ThrowIfCancellationRequested();
                 try
                 {
-                    var path = await FreeNameAsync(target, folder, item.FileName, ct);
-                    var sameStorage = sourceStorage is not null && sourceStorage.Id == storage.Id;
-                    if (session.MoveFiles && sameStorage && source is not null)
+                    if (sameStorage && string.Equals(AlbumNames.ParentOf(item.SourcePath), folder, StringComparison.Ordinal))
                     {
+                        // in its album already: it stays as it is (not "IMG_1 (2).jpg" beside itself)
+                        item.TargetPath = item.SourcePath;
+                    }
+                    else if (sameStorage && source is not null)
+                    {
+                        var path = await FreeNameAsync(target, folder, item.FileName, ct);
                         await source.MoveAsync(item.SourcePath, path, overwrite: false, ct);
+                        item.TargetPath = path;
+                        left.Add(AlbumNames.ParentOf(item.SourcePath));
                     }
                     else
                     {
+                        var path = await FreeNameAsync(target, folder, item.FileName, ct);
                         await using (var input = source is null
                             ? new FileStream(Path.Combine(staging, item.SourcePath), FileMode.Open, FileAccess.Read, FileShare.Read, 81920, useAsync: true)
                             : await source.OpenReadAsync(item.SourcePath, 0, ct))
@@ -319,14 +338,15 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
                             await target.WriteAsync(path, input, item.Size, overwrite: false, ct);
                         }
 
+                        item.TargetPath = path;
                         if (session.MoveFiles && source is not null)
                         {
                             await source.DeleteAsync(item.SourcePath, ct);
+                            left.Add(AlbumNames.ParentOf(item.SourcePath));
                         }
                     }
 
                     item.State = ImportItemState.Imported;
-                    item.TargetPath = path;
                     session.ImportedCount++;
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
@@ -343,6 +363,21 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
             ActivityLog.Add(db, session.UserId, "import", group.Name, $"{items.Count(i => i.State == ImportItemState.Imported)} files", storageId: storage.Id);
         }
 
+        // the folders the files left and nothing else is in go into the trash (DCIM/100CANON after sorting a storage)
+        if (source is not null && sourceStorage is not null && left.Count > 0)
+        {
+            var trashed = await TrashEmptyFoldersAsync(source, left, session.SourcePath ?? string.Empty, ct);
+            if (trashed.Count > 0)
+            {
+                ActivityLog.Add(db, session.UserId, "import", Text.T("Import.EmptyFolders", trashed.Count), string.Join("; ", trashed.Take(20)), storageId: sourceStorage.Id);
+            }
+
+            if (sourceStorage.IsLibrary)
+            {
+                targets.Add(sourceStorage.Id); // the files left it
+            }
+        }
+
         session.State = ImportState.Done;
         session.FinishedDate = DateTime.UtcNow;
         await db.SaveChangesAsync(ct);
@@ -357,6 +392,59 @@ public sealed class ImportWorker(IServiceScopeFactory scopes, StorageConnections
         }
 
         log.LogInformation("Import {Token} done: {Imported} imported, {Failed} failed.", session.Token, session.ImportedCount, session.FailedCount);
+    }
+
+    /// <summary>
+    /// Moves the folders below the source of the import that the files left and that hold nothing else now (only what a system leaves: <c>@eaDir</c>,
+    /// <c>.DS_Store</c>, <c>Thumbs.db</c>) into the trash of the storage (<c>.matphoto-trash/&lt;date&gt;/&lt;path&gt;</c>), the deepest first, so their parents
+    /// can follow. The source folder itself stays (an inbox is used again). Answers the folders moved.
+    /// </summary>
+    private async Task<List<string>> TrashEmptyFoldersAsync(IStorageProvider source, IEnumerable<string> left, string root, CancellationToken ct)
+    {
+        var candidates = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var folder in left)
+        {
+            for (var path = folder; path.Length > 0 && path != root && (root.Length == 0 || path.StartsWith(root + "/", StringComparison.Ordinal)); path = AlbumNames.ParentOf(path))
+            {
+                candidates.Add(path);
+            }
+        }
+
+        // empty: nothing but leftovers and folders that are empty themselves (the deepest are looked at first); only the topmost of them moves
+        var empty = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var folder in candidates.OrderByDescending(p => p.Count(c => c == '/')).ThenBy(p => p, StringComparer.Ordinal))
+        {
+            try
+            {
+                if ((await source.ListAsync(folder, ct)).All(e => MediaFormats.IsLeftover(e) || (e.IsFolder && empty.Contains(e.Path))))
+                {
+                    empty.Add(folder);
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                log.LogInformation("The folder {Folder} could not be read: {Message}", folder, StorageErrors.Message(ex));
+            }
+        }
+
+        var stamp = DateTime.UtcNow.ToString("yyyyMMdd-HHmmss", System.Globalization.CultureInfo.InvariantCulture);
+        var trashed = new List<string>();
+        foreach (var folder in empty.Where(f => !empty.Contains(AlbumNames.ParentOf(f))).Order(StringComparer.Ordinal))
+        {
+            try
+            {
+                var target = $"{MediaFormats.TrashFolder}/{stamp}/{folder}";
+                await StorageFolders.EnsureAsync(source, AlbumNames.ParentOf(target), ct);
+                await source.MoveAsync(folder, target, overwrite: false, ct);
+                trashed.Add(folder);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                log.LogInformation("The empty folder {Folder} stays: {Message}", folder, StorageErrors.Message(ex));
+            }
+        }
+
+        return trashed;
     }
 
     /// <summary>A name that is free in the folder: <c>IMG_0001.jpg</c>, else <c>IMG_0001 (2).jpg</c> …</summary>

@@ -45,7 +45,7 @@
 }
 else if (v.State == ImportState.Done)
 {
-    <div class="mat-alert mat-alert--success" role="status">@Ui.Icon("check-circle")<div class="mat-alert__body"><strong>@L["Import.Done", v.ImportedCount]</strong> @L["Import.DoneText", v.SkippedCount, v.FailedCount]</div></div>
+    <div class="mat-alert mat-alert--success" role="status">@Ui.Icon("check-circle")<div class="mat-alert__body"><strong>@L["Import.Done", v.ImportedCount]</strong> @L["Import.DoneText", v.SkippedCount, v.FailedCount]@if (v.Stayed > 0) { @(" ")@L["Import.Stayed", v.Stayed] }</div></div>
     <div class="md-cards">
         @foreach (var g in v.Groups.Where(g => g.Include))
         {
@@ -77,7 +77,11 @@ else
             <div class="mat-card__body mat-form">
                 <md-field name="TargetStorageId" kind="radios" label="@L["Import.TargetStorage"]" value="@Model.TargetStorageId" options="Model.Targets" />
                 <md-field name="TargetFolder" label="@L["Import.TargetFolder"]" value="@Model.TargetFolder" maxlength="2000" optional mono hint="@L["Import.TargetFolder.Hint"]" autocomplete="off" />
-                @if (v.Source == ImportSource.Storage)
+                @if (v.InPlace)
+                {
+                    <div class="mat-alert mat-alert--info" role="note">@Ui.Icon("wand")<div class="mat-alert__body"><strong>@L["Import.InPlace", v.SourceName ?? ""]</strong> @L["Import.InPlaceText"]</div></div>
+                }
+                else if (v.Source == ImportSource.Storage)
                 {
                     <p class="mat-hint">@Ui.Icon(v.MoveFiles ? "folder-open" : "copy") @L[v.MoveFiles ? "Import.WillMove" : "Import.WillCopy", v.SourceName ?? "", v.SourcePath ?? ""]</p>
                 }

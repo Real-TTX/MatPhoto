@@ -705,10 +705,7 @@ class Viewer {
     this.trashButton.hidden = !d.canEdit;
     this.info.replaceChildren(...[
       el('h2', { class: 'md-viewer__info-title', text: t('Viewer.Info') }),
-      // the people on the photo (when the recognition is on): their faces, a link to all their photos
-      d.people?.length ? el('div', { class: 'md-viewer__people' }, el('h3', { text: t('Viewer.People') }),
-        el('div', { class: 'md-viewer__people-list' }, d.people.map(p => el('a', { class: 'md-viewer__person' + (p.named ? '' : ' is-unnamed'), href: `/People/View/${p.id}` },
-          el('img', { src: `/faces/${p.face}/thumb`, alt: '', loading: 'lazy' }), el('span', { text: p.name }))))) : null,
+      this.peopleSection(d),
       el('ul', { class: 'md-facts' }, d.rows.map(r => el('li', { class: 'md-fact' },
         icon(r.icon),
         el('div', { class: 'md-fact__body' },
@@ -716,6 +713,64 @@ class Viewer {
           el('small', { class: 'md-fact__label', text: r.secondary || r.label }))))),
       d.lists.length ? el('div', { class: 'md-viewer__lists' }, el('h3', { text: t('Lists.Title') }),
         el('div', { class: 'mat-chips' }, d.lists.map(l => el('a', { class: 'mat-chip', href: `/Lists/View/${l.id}` }, el('span', { class: 'mat-chip__text', text: l.name }))))) : null].filter(Boolean));
+  }
+
+  /**
+   * The faces on the photo (when the recognition is on): a person links to all their photos; the pencil says who it is – a name another person has puts the face
+   * there, a new name makes a person, "nobody" hides the face (someone in the background).
+   */
+  peopleSection(d) {
+    if (!d.people?.length) return null;
+    const form = el('form', { class: 'md-viewer__name', hidden: true });
+    const list = el('div', { class: 'md-viewer__people-list' }, d.people.map(p => {
+      const face = el('img', { src: `/faces/${p.face}/thumb`, alt: '', loading: 'lazy' });
+      const label = el('span', { text: p.name });
+      const main = p.id
+        ? el('a', { class: 'md-viewer__person-main', href: `/People/View/${p.id}` }, face, label)
+        : el('span', { class: 'md-viewer__person-main' }, face, label);
+      const edit = el('button', { type: 'button', class: 'md-viewer__person-edit', 'aria-label': t('Viewer.WhoIsThis'), title: t('Viewer.WhoIsThis') }, icon('edit'));
+      edit.addEventListener('click', () => this.nameFace(form, p));
+      return el('div', { class: 'md-viewer__person' + (p.named ? '' : ' is-unnamed') + (p.id ? '' : ' is-unknown') }, main, edit);
+    }));
+    return el('div', { class: 'md-viewer__people' }, el('h3', { text: t('Viewer.People') }), list, form);
+  }
+
+  /** The little form under the faces: the name (the names there are suggested), save, "nobody", cancel. */
+  async nameFace(form, p) {
+    const id = this.id;
+    if (!this.names) {
+      try { this.names = (await request('GET', '/live/people/names')).names; } catch { this.names = []; }
+    }
+    const input = el('input', { class: 'mat-input', id: 'md-face-name', name: 'name', autocomplete: 'off', maxlength: '200', list: 'md-face-names', value: p.current || '', placeholder: t('Viewer.NamePlaceholder') });
+    const cancel = el('button', { type: 'button', class: 'mat-btn mat-btn--ghost mat-btn--sm', text: t('Common.Cancel') });
+    const nobody = el('button', { type: 'button', class: 'mat-btn mat-btn--ghost mat-btn--sm', title: t('Viewer.NobodyHint') }, icon('eye-off'), el('span', { text: t('Viewer.Nobody') }));
+    form.replaceChildren(
+      el('img', { class: 'md-viewer__name-face', src: `/faces/${p.face}/thumb`, alt: '' }),
+      el('div', { class: 'mat-field' },
+        el('label', { class: 'mat-label', for: 'md-face-name', text: t('Viewer.WhoIsThis') }),
+        input,
+        el('datalist', { id: 'md-face-names' }, this.names.map(n => el('option', { value: n }))),
+        el('span', { class: 'mat-hint', text: t('Viewer.NameHint') })),
+      el('div', { class: 'mat-btn-row mat-btn-row--plain' },
+        el('button', { type: 'submit', class: 'mat-btn mat-btn--primary mat-btn--sm' }, icon('check'), el('span', { text: t('Viewer.SaveName') })), nobody, cancel));
+    form.hidden = false;
+    input.focus();
+    input.select();
+    const refresh = async message => {
+      toast(message, 'success');
+      this.names = null;
+      if (this.id !== id) return;
+      try { this.detail = await request('GET', `/live/media/${id}`); this.describe(this.detail); } catch { /* the next photo shows it */ }
+    };
+    cancel.onclick = () => { form.hidden = true; form.replaceChildren(); };
+    nobody.onclick = async () => {
+      try { await refresh((await request('POST', `/live/faces/${p.face}/ignore`, {})).message); } catch (e) { toast(e.body?.error || t('Grid.Failed'), 'danger'); }
+    };
+    form.onsubmit = async e => {
+      e.preventDefault();
+      if (!input.value.trim()) { input.focus(); return; }
+      try { await refresh((await request('POST', `/live/faces/${p.face}/name`, { name: input.value })).message); } catch (err) { toast(err.body?.error || t('Grid.Failed'), 'danger'); }
+    };
   }
 
   async action(name) {

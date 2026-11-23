@@ -71,7 +71,8 @@ src/MatPhoto
                              112 × 112, SFace makes 128 numbers of length 1), FaceGrouping (pure: a face joins the person of the most alike face ≥ 0.42, else 3 alike
                              faces ≥ 0.47 make a new person without a name), FaceWorker (hosted: previews of the cache, newest first, then grouping), FaceCrops
                              (round pictures of faces), PeopleService (business layer: list, name – a name another person has joins them –, merge, hide, "not this
-                             person", forget, stats, delete all; a person exists for a viewer only on photos they may see, who may then also name it)
+                             person", forget, a face to a person by name (`AssignAsync`: the viewer's "who is this?", splitting a group on the page Edit; a new
+                             name makes a person, the face is confirmed and the old person rejected) or to nobody (`IgnoreAsync`), stats, delete all; a person exists for a viewer only on photos they may see, who may then also name it)
   Services/Accounts|Auth/    profiles, user administration, sessions in the DB, MatIdentity sign-in, GDPR export/erase
   Services/                  InstanceService (numbers, settings, housekeeping), MenuService, Ui (icons, logo, bytes), ListModels (toolbar, pager), Dates, Assets
   MatPlatform/               copy of the shared package (MatDesign, 2.4.0). Never edit here.
@@ -103,11 +104,15 @@ Administrators manage storages but see their photos only with a role like anybod
 the hash and size of a vanished record takes that record (favourites and lists survive moves). Live Photos: photo + video ≤ 5 s of the same name. Folders a NAS keeps
 (`@eaDir`, `#recycle` …), hidden folders, `.matphoto-trash` and the cache folder are never scanned. **People**: `Media.FaceState` (Pending / Done / Failed; a changed file is looked at again), `Face` (box relative 0..1, `Embedding` real[128], `Clustered`,
 `IsIgnored` = forgotten, `IsConfirmed`), `Person` (soft delete, `Name` null = "who is this?", `IsHidden`, `CoverFaceId`), `FaceRejection` ("not this person").
-`SystemSetting.FacesEnabled` (off by default: biometric data). Scope `person:<id>`; the search finds names; the viewer info lists the people. A change of the cache place or the sizes sets every record to
+`SystemSetting.FacesEnabled` (off by default: biometric data). Scope `person:<id>`; the search finds names; the viewer info lists the people and the largest faces of
+nobody (`/live/faces/{id}/name|ignore`, names from `/live/people/names`); a person left without faces is gone. A change of the cache place or the sizes sets every record to
 `Pending` (they stay visible) and the next scans make the thumbnails again. **Import suggestion** (`ImportService.Suggest`): a folder a person named is ONE album
 whatever the camera clock says (`AlbumNames.AlbumFolderOf`: day folders like `20100127` belong to their parent; device folders `DCIM`, `100CANON`, `WhatsApp Images`,
 `Fotos`, years name no album); a year in the name becomes the first date of that year, else the name stays (`2008 Familie Olleck`). Only the rest goes by time and
-place. Files of the import's source that are in the library are no duplicates of the library.
+place. Files of the import's source that are in the library are no duplicates of the library. **In place** (`ImportService.IsInPlace`: a folder of a library
+imported into the same library, e.g. a NAS connected anew): the files are always moved, never copied; the target folder is the top, not `ImportFolder`; a folder that
+is an album already is the group's album and a file in its album stays (no `name (2).jpg` beside itself). After every import that moved files the folders the files left that hold only what a
+system leaves (`MediaFormats.IsLeftover`: `@eaDir`, `.DS_Store`, `Thumbs.db`) go into `.matphoto-trash/<date>/` (the source folder itself stays).
 
 **UI (MatDesign rules)**: CRUD = list page (toolbar above, table/cards, pager under it, actions left below) + separate edit page (Save, Back, space, Delete); a
 storage has **tabs** (General, Access), System has tabs (General, Thumbnails, Import). The grid and the viewer are the special UI of the app (the viewer on black),

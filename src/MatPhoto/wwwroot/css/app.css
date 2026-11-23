@@ -344,10 +344,19 @@ button.md-strip__more:hover { background: var(--mat-surface-3); color: var(--mat
 .md-viewer__people { margin: 0 0 var(--mat-space-5); padding-bottom: var(--mat-space-4); border-bottom: 1px solid var(--mat-border); }
 .md-viewer__people h3 { margin: 0 0 var(--mat-space-2); font-size: var(--mat-fs-sm); color: var(--mat-text-muted); }
 .md-viewer__people-list { display: flex; flex-wrap: wrap; gap: var(--mat-space-2); }
-.md-viewer__person { display: inline-flex; align-items: center; gap: var(--mat-space-2); padding: 3px 12px 3px 3px; border: 1px solid var(--mat-border); border-radius: 999px; color: inherit; text-decoration: none; font-size: var(--mat-fs-sm); }
-.md-viewer__person:hover { background: var(--mat-surface-2); }
+.md-viewer__person { display: inline-flex; align-items: center; border: 1px solid var(--mat-border); border-radius: 999px; font-size: var(--mat-fs-sm); }
+.md-viewer__person.is-unknown { border-style: dashed; }
+.md-viewer__person-main { display: inline-flex; align-items: center; gap: var(--mat-space-2); padding: 3px 6px 3px 3px; border-radius: 999px 0 0 999px; color: inherit; text-decoration: none; }
+a.md-viewer__person-main:hover { background: var(--mat-surface-2); }
 .md-viewer__person img { width: 30px; height: 30px; border-radius: 50%; object-fit: cover; }
-.md-viewer__person.is-unnamed span { color: var(--mat-text-muted); font-style: italic; }
+.md-viewer__person.is-unnamed .md-viewer__person-main span { color: var(--mat-text-muted); font-style: italic; }
+.md-viewer__person-edit { display: inline-grid; place-items: center; width: 30px; height: 30px; margin-right: 3px; padding: 0; border: 0; border-radius: 50%; background: none; color: var(--mat-text-muted); cursor: pointer; }
+.md-viewer__person-edit:hover, .md-viewer__person-edit:focus-visible { background: var(--mat-surface-2); color: var(--mat-text); }
+.md-viewer__person-edit svg { width: 15px; height: 15px; }
+.md-viewer__name { display: grid; grid-template-columns: 56px 1fr; gap: var(--mat-space-2) var(--mat-space-3); align-items: start; margin-top: var(--mat-space-3); padding: var(--mat-space-3); border: 1px solid var(--mat-border); border-radius: var(--mat-radius, 10px); }
+.md-viewer__name-face { width: 56px; height: 56px; border-radius: 50%; object-fit: cover; }
+.md-viewer__name .mat-btn-row { grid-column: 1 / -1; flex-wrap: wrap; }
+.md-faces__move { margin-top: var(--mat-space-4); max-width: 32rem; }
 @media (max-width: 599px) {
   .md-people { grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); }
   .md-person__face { width: 88px; }

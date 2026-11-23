@@ -1,4 +1,5 @@
 using MatPhoto.Data;
+using MatPhoto.Services.Storages;
 
 namespace MatPhoto.Services.Library;
 
@@ -67,6 +68,14 @@ public static class MediaFormats
 
     /// <summary>Files a system writes next to the photos (<c>._IMG_0001.JPG</c> of a Mac, <c>.DS_Store</c>) are not photos.</summary>
     public static bool IsHiddenFile(string fileName) => fileName.StartsWith("._", StringComparison.Ordinal) || fileName.StartsWith('.');
+
+    /// <summary>
+    /// What a system leaves in a folder beside the photos (<c>.DS_Store</c>, <c>Thumbs.db</c>, <c>desktop.ini</c>, the <c>@eaDir</c> of a Synology): a folder with
+    /// nothing else is empty. The trash and the cache of MatPhoto are never left over.
+    /// </summary>
+    public static bool IsLeftover(StorageEntry entry) => entry.IsFolder
+        ? !IsScanned(entry.Name) && entry.Name is not (TrashFolder or ".matphoto-cache")
+        : IsHiddenFile(entry.Name) || entry.Name.Equals("Thumbs.db", StringComparison.OrdinalIgnoreCase) || entry.Name.Equals("desktop.ini", StringComparison.OrdinalIgnoreCase);
 
     /// <summary>Whether a scan enters a folder: never the built-in ones, never one of <paramref name="extra"/> (the setting of the storage, separated by ;).</summary>
     public static bool IsScanned(string folderName, IReadOnlySet<string>? extra = null)

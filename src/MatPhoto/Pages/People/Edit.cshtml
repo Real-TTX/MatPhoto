@@ -36,6 +36,17 @@
                     </div>
                 }
             </div>
+            <div class="mat-field md-faces__move">
+                <label class="mat-label" for="MoveTo">@L["People.MoveTo"]</label>
+                <input class="mat-input" id="MoveTo" name="MoveTo" value="@Model.MoveTo" maxlength="200" autocomplete="off" list="people-names" placeholder="@L["People.NamePlaceholder"]" />
+                <datalist id="people-names">
+                    @foreach (var n in Model.Names)
+                    {
+                        <option value="@n"></option>
+                    }
+                </datalist>
+                <span class="mat-hint">@L["People.MoveToHint"]</span>
+            </div>
         </div>
     </div>
 

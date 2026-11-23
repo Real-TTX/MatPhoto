@@ -19,8 +19,8 @@ public sealed record PersonDetail(long Id, string? Name, bool Hidden, int Photos
 /// <summary>A face of a person (the page Edit: "not this person").</summary>
 public sealed record PersonFace(long Id, long MediaId, bool Confirmed);
 
-/// <summary>A person on a photo (the info of the viewer).</summary>
-public sealed record PhotoPerson(long Id, string? Name, long FaceId);
+/// <summary>A face on a photo (the info of the viewer): of a person (<paramref name="Id"/>, a name or not yet), or of nobody yet ("who is this?").</summary>
+public sealed record PhotoPerson(long? Id, string? Name, long FaceId);
 
 /// <summary>What the person changes on the page Edit of a person.</summary>
 public sealed record PersonInput(string? Name, bool Hidden, long? MergeIntoId);
@@ -122,12 +122,111 @@ public static class PeopleService
         return rows.Select(r => (r.Id, r.Name!)).ToList();
     }
 
-    /// <summary>The people on a photo the viewer sees (the info of the viewer), left to right.</summary>
+    /// <summary>The most faces of nobody shown on a photo (the largest: a crowd behind is not worth naming).</summary>
+    private const int UnknownShown = 6;
+
+    /// <summary>
+    /// The faces on a photo the viewer sees (the info of the viewer), left to right: the people on it (each once, not the hidden ones), then the largest faces that
+    /// belong to nobody yet, to be named there.
+    /// </summary>
     public static async Task<IReadOnlyList<PhotoPerson>> OnPhotoAsync(AppDbContext db, long mediaId, CancellationToken ct = default)
     {
-        var rows = await db.Faces.AsNoTracking().Where(f => f.MediaId == mediaId && f.PersonId != null && !f.IsIgnored && !f.Person!.IsHidden)
-            .OrderBy(f => f.X).Select(f => new { PersonId = f.PersonId!.Value, f.Person!.Name, f.Id }).ToListAsync(ct);
-        return rows.DistinctBy(r => r.PersonId).Select(r => new PhotoPerson(r.PersonId, r.Name, r.Id)).ToList();
+        var rows = await db.Faces.AsNoTracking().Where(f => f.MediaId == mediaId && !f.IsIgnored && (f.PersonId == null || !f.Person!.IsHidden))
+            .Select(f => new { f.PersonId, Name = f.Person == null ? null : f.Person.Name, f.Id, f.X, f.Width }).ToListAsync(ct);
+        var known = rows.Where(r => r.PersonId != null).OrderBy(r => r.X).DistinctBy(r => r.PersonId);
+        var unknown = rows.Where(r => r.PersonId == null).OrderByDescending(r => r.Width).Take(UnknownShown);
+        return known.Concat(unknown).OrderBy(r => r.X).Select(r => new PhotoPerson(r.PersonId, r.Name, r.Id)).ToList();
+    }
+
+    /// <summary>
+    /// "This is …": faces the viewer sees go to the person of the name (a name nobody has yet makes a new person) and stay there – confirmed, the grouping never
+    /// moves them. A face taken from another person is not put back there; a person left without faces is gone. Answers the person, or why not.
+    /// </summary>
+    public static async Task<Outcome<long>> AssignAsync(AppDbContext db, long userId, IReadOnlyCollection<long> faceIds, string? name, CancellationToken ct = default)
+    {
+        var clean = Clean(name);
+        if (clean is null)
+        {
+            return Outcome<long>.Fail(Text.T("People.Error.Name"));
+        }
+
+        var visible = await StorageAccess.VisibleIdsAsync(db, userId, ct);
+        var faces = await db.Faces.Where(f => faceIds.Contains(f.Id) && visible.Contains(f.Media!.StorageId)).ToListAsync(ct);
+        if (faces.Count == 0)
+        {
+            return Outcome<long>.Denied();
+        }
+
+        var lower = clean.ToLower();
+        var person = await db.People.FirstOrDefaultAsync(p => p.Name != null && p.Name.ToLower() == lower, ct);
+        if (person is null)
+        {
+            person = db.People.Add(new Person { Name = clean }).Entity;
+            await db.SaveChangesAsync(ct);
+        }
+
+        var ids = faces.Select(f => f.Id).ToList();
+        await db.FaceRejections.Where(r => ids.Contains(r.FaceId) && r.PersonId == person.Id).ExecuteDeleteAsync(ct);
+        var left = new HashSet<long>();
+        foreach (var face in faces.Where(f => f.PersonId != person.Id || !f.IsConfirmed || f.IsIgnored))
+        {
+            if (face.PersonId is { } from && from != person.Id)
+            {
+                left.Add(from);
+                db.FaceRejections.Add(new FaceRejection { FaceId = face.Id, PersonId = from });
+            }
+
+            face.PersonId = person.Id;
+            face.IsConfirmed = true;
+            face.IsIgnored = false;
+            face.Clustered = true;
+        }
+
+        person.CoverFaceId ??= faces[0].Id;
+        person.UpdateState = SoftEntity.Updated;
+        ActivityLog.Add(db, userId, "person", clean, Text.T("People.Activity.Assigned", faces.Count));
+        await db.SaveChangesAsync(ct);
+        await TidyAsync(db, left, ids, ct);
+        return Outcome<long>.Success(person.Id);
+    }
+
+    /// <summary>"Nobody to name": the face leaves its person and is not shown any more (someone in the background). False when the viewer does not see it.</summary>
+    public static async Task<bool> IgnoreAsync(AppDbContext db, long userId, long faceId, CancellationToken ct = default)
+    {
+        var visible = await StorageAccess.VisibleIdsAsync(db, userId, ct);
+        var face = await db.Faces.FirstOrDefaultAsync(f => f.Id == faceId && visible.Contains(f.Media!.StorageId), ct);
+        if (face is null)
+        {
+            return false;
+        }
+
+        var from = face.PersonId;
+        face.PersonId = null;
+        face.IsIgnored = true;
+        face.IsConfirmed = false;
+        face.Clustered = true;
+        await db.SaveChangesAsync(ct);
+        await TidyAsync(db, from is { } id ? [id] : [], [faceId], ct);
+        return true;
+    }
+
+    /// <summary>The people faces were taken from: gone when no face is left, else a cover that left is chosen anew.</summary>
+    private static async Task TidyAsync(AppDbContext db, IReadOnlyCollection<long> people, IReadOnlyCollection<long> faceIds, CancellationToken ct)
+    {
+        foreach (var person in await db.People.Where(p => people.Contains(p.Id)).ToListAsync(ct))
+        {
+            if (!await db.Faces.AnyAsync(f => f.PersonId == person.Id && !f.IsIgnored, ct))
+            {
+                person.UpdateState = SoftEntity.Deleted;
+            }
+            else if (person.CoverFaceId is { } cover && faceIds.Contains(cover))
+            {
+                person.CoverFaceId = null;
+                person.UpdateState = SoftEntity.Updated;
+            }
+        }
+
+        await db.SaveChangesAsync(ct);
     }
 
     /// <summary>Where a face is and the picture it is on (its thumbnail), if the viewer may see it; else null.</summary>
