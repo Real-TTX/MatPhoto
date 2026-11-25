@@ -5,7 +5,9 @@
   "Photos.Empty": { "en": "No photos yet", "de": "Noch keine Fotos" },
   "Photos.EmptyText": { "en": "Import photos, or wait for the first scan of the storages to finish.", "de": "Importiere Fotos oder warte, bis der erste Scan der Speicher fertig ist." },
   "Photos.Pending": { "en": "{0} files are still being read; they appear as soon as their thumbnails are made.", "de": "{0} Dateien werden noch gelesen; sie erscheinen, sobald ihre Vorschaubilder fertig sind." },
-  "Photos.NoStorage": { "en": "No storage yet", "de": "Noch kein Speicher" },
+  "Photos.NoImport": { "en": "You cannot import yet: importing needs the role Editor on a library storage location – being an administrator manages the storage locations but gives no role on the photos.", "de": "Du kannst noch nicht importieren: Dafür brauchst du auf einem Bibliotheks-Speicherort die Rolle Bearbeiter – als Administrator verwaltest du die Speicherorte, bekommst damit aber keine Rolle auf die Fotos." },
+  "Photos.NoImport.Link": { "en": "Storage locations → Access", "de": "Speicherorte → Zugriff" },
+  "Photos.NoStorage":{ "en": "No storage yet", "de": "Noch kein Speicher" },
   "Photos.NoStorage.Admin": { "en": "Add a storage – a folder of the server or a share of your NAS (SMB, WebDAV, SFTP, FTP). Its folders become the albums.", "de": "Lege einen Speicher an – einen Ordner des Servers oder eine Freigabe deines NAS (SMB, WebDAV, SFTP, FTP). Seine Ordner werden zu Alben." },
   "Photos.NoStorage.User": { "en": "An administrator has not given you a storage yet.", "de": "Ein Administrator hat dir noch keinen Speicher freigegeben." },
 

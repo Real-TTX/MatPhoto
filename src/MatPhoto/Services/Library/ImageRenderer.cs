@@ -23,12 +23,12 @@ public static class ImageRenderer
     }
 
     /// <summary>Renders the picture in <paramref name="data"/>. Throws <see cref="MagickException"/> for a file ImageMagick cannot read.</summary>
-    public static async Task<RenderedImage> RenderAsync(byte[] data, string extension, int thumbHeight, int previewSize, int quality, CancellationToken ct)
+    public static async Task<RenderedImage> RenderAsync(byte[] data, string extension, int thumbHeight, int previewSize, int quality, CancellationToken ct, int orientation = 1)
     {
         await Gate.WaitAsync(ct);
         try
         {
-            return Render(data, extension, thumbHeight, previewSize, quality);
+            return Render(data, extension, thumbHeight, previewSize, quality, orientation);
         }
         finally
         {
@@ -36,10 +36,17 @@ public static class ImageRenderer
         }
     }
 
-    public static RenderedImage Render(byte[] data, string extension, int thumbHeight, int previewSize, int quality)
+    /// <param name="orientation">The EXIF orientation of the file (1 to 8): a camera RAW keeps it beside its embedded preview, not in it.</param>
+    public static RenderedImage Render(byte[] data, string extension, int thumbHeight, int previewSize, int quality, int orientation = 1)
     {
-        var settings = new MagickReadSettings { FrameIndex = 0, FrameCount = 1 };
         var ext = extension.ToLowerInvariant();
+        if (RawFormats.TryGetValue(ext, out var raw))
+        {
+            using var picture = ReadRaw(data, raw, previewSize, orientation, out var size);
+            return Finish(picture, thumbHeight, previewSize, quality, size, animated: false);
+        }
+
+        var settings = new MagickReadSettings { FrameIndex = 0, FrameCount = 1 };
         if (ext is ".jpg" or ".jpeg" or ".jpe")
         {
             // the decoder of JPEG can skip detail it will throw away: decode at about twice the size of the preview
@@ -56,6 +63,85 @@ public static class ImageRenderer
 
         using var image = new MagickImage(data, settings);
         image.AutoOrient();
+
+        // the original size of a JPEG decoded smaller: the decoder told it before scaling
+        (uint Width, uint Height)? stored = null;
+        if (ext is ".jpg" or ".jpeg" or ".jpe")
+        {
+            var info = new MagickImageInfo(data);
+            stored = (info.Width, info.Height);
+        }
+
+        return Finish(image, thumbHeight, previewSize, quality, stored, animated);
+    }
+
+    /// <summary>
+    /// The camera RAW formats and how ImageMagick (LibRaw) is told which one a file is. Most of them begin like a TIFF: read without the format, ImageMagick takes them
+    /// for one and shows the tiny first picture of the file (NEF) or fails (ARW).
+    /// </summary>
+    internal static readonly Dictionary<string, MagickFormat> RawFormats = new(StringComparer.Ordinal)
+    {
+        [".dng"] = MagickFormat.Dng, [".cr2"] = MagickFormat.Cr2, [".cr3"] = MagickFormat.Cr3, [".nef"] = MagickFormat.Nef, [".arw"] = MagickFormat.Arw,
+        [".orf"] = MagickFormat.Orf, [".rw2"] = MagickFormat.Rw2, [".raf"] = MagickFormat.Raf, [".pef"] = MagickFormat.Pef, [".srw"] = MagickFormat.Srw,
+        [".crw"] = MagickFormat.Crw, [".nrw"] = MagickFormat.Nrw, [".mrw"] = MagickFormat.Mrw, [".sr2"] = MagickFormat.Sr2, [".srf"] = MagickFormat.Srf, [".rwl"] = MagickFormat.Rwl,
+        [".kdc"] = MagickFormat.Kdc, [".dcr"] = MagickFormat.Dcr, [".erf"] = MagickFormat.Erf, [".3fr"] = MagickFormat.ThreeFr, [".iiq"] = MagickFormat.Iiq, [".mef"] = MagickFormat.Mef,
+        [".mos"] = MagickFormat.Mos, [".x3f"] = MagickFormat.X3f,
+
+        // ".raw" of Panasonic and Leica: ImageMagick's own RAW is bare pixels, DCRAW hands the file to LibRaw
+        [".raw"] = MagickFormat.Dcraw,
+    };
+
+    /// <summary>
+    /// A camera RAW: the JPEG the camera put into the file (what its screen showed: its colours, its white balance, fast), turned by the orientation of the file.
+    /// Only when it has none of at least half the preview size, the sensor data is developed (slow: seconds) with the white balance of the camera.
+    /// <paramref name="size"/> is the size of the sensor picture (as stored, before turning).
+    /// </summary>
+    private static MagickImage ReadRaw(byte[] data, MagickFormat format, int previewSize, int orientation, out (uint Width, uint Height)? size)
+    {
+        size = null;
+        try
+        {
+            var info = new MagickImageInfo(data, new MagickReadSettings { Format = format });
+            size = (info.Width, info.Height);
+        }
+        catch (MagickException)
+        {
+            // the size of the embedded picture then
+        }
+
+        var embedded = new MagickReadSettings { Format = format };
+        embedded.SetDefines(new ImageMagick.Formats.DngReadDefines { ReadThumbnails = true });
+        try
+        {
+            using var thumbnails = new MagickImageCollection(data, embedded);
+            var largest = thumbnails.OrderByDescending(t => (long)t.Width * t.Height).FirstOrDefault();
+            if (largest is not null && Math.Max(largest.Width, largest.Height) >= Math.Min(previewSize / 2, 1024))
+            {
+                var picture = (MagickImage)largest.Clone();
+                if (picture.Orientation is ImageMagick.Orientation.Undefined or ImageMagick.Orientation.TopLeft && orientation is >= 2 and <= 8)
+                {
+                    picture.Orientation = (ImageMagick.Orientation)orientation;
+                }
+
+                picture.AutoOrient();
+                return picture;
+            }
+        }
+        catch (MagickException)
+        {
+            // no embedded picture LibRaw can give: develop the sensor data
+        }
+
+        var developed = new MagickReadSettings { Format = format };
+        developed.SetDefines(new ImageMagick.Formats.DngReadDefines { UseCameraWhiteBalance = true, OutputColor = ImageMagick.Formats.DngOutputColor.SRGB });
+        var image = new MagickImage(data, developed);
+        image.AutoOrient();
+        return image;
+    }
+
+    /// <summary>The common end: sRGB, onto white, without metadata, the preview and the tile as JPEG, the picture hash. <paramref name="stored"/>: the size of the original when the picture was decoded smaller.</summary>
+    private static RenderedImage Finish(MagickImage image, int thumbHeight, int previewSize, int quality, (uint Width, uint Height)? stored, bool animated)
+    {
         if (image.GetColorProfile() is not null)
         {
             image.TransformColorSpace(ColorProfiles.SRGB);
@@ -70,6 +156,12 @@ public static class ImageRenderer
         image.Strip();
         var width = (int)image.Width;
         var height = (int)image.Height;
+        if (stored is { } original && original.Width > 0 && original.Height > 0)
+        {
+            var turned = image.Width < image.Height != original.Width < original.Height;
+            width = (int)(turned ? original.Height : original.Width);
+            height = (int)(turned ? original.Width : original.Height);
+        }
 
         using var preview = image.Clone();
         preview.Resize(new MagickGeometry((uint)previewSize, (uint)previewSize) { Greater = true });
@@ -79,15 +171,6 @@ public static class ImageRenderer
         thumb.Resize(new MagickGeometry((uint)thumbHeight * 4, (uint)thumbHeight) { Greater = true });
         thumb.Sharpen(0, 0.5);
         var thumbBytes = Jpeg(thumb, quality);
-
-        // the original size of a JPEG decoded smaller: the decoder told it before scaling
-        if (ext is ".jpg" or ".jpeg" or ".jpe")
-        {
-            var info = new MagickImageInfo(data);
-            var turned = image.Width < image.Height != info.Width < info.Height;
-            width = (int)(turned ? info.Height : info.Width);
-            height = (int)(turned ? info.Width : info.Height);
-        }
 
         return new RenderedImage(thumbBytes, previewBytes, width, height, DifferenceHash(thumb), animated);
     }

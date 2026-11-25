@@ -202,7 +202,12 @@ public static class StorageAdmin
         var created = storage is null;
         storage ??= db.Storages.Add(new Storage()).Entity;
         Apply(connections, storage, input);
-        if (!created)
+        if (created)
+        {
+            // the administrator who adds it may import into it and sort it at once (managing storages alone shows no photo); the tab Access changes it
+            storage.Access.Add(new StorageAccessEntry { UserId = adminId, Role = AccessRole.Editor });
+        }
+        else
         {
             storage.UpdateState = SoftEntity.Updated;
         }

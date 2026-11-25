@@ -10,7 +10,7 @@ public sealed class ActivityModel(AppDbContext db) : AppPageModel
 {
     private const int PageSize = 50;
 
-    public static readonly string[] Actions = ["scan", "import", "album", "trash", "storage", "setting"];
+    public static readonly string[] Actions = ["scan", "import", "album", "trash", "person", "share", "storage", "setting"];
 
     public IReadOnlyList<ActivityRow> Items { get; private set; } = [];
 

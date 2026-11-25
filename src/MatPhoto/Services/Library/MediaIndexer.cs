@@ -198,7 +198,7 @@ public sealed class MediaIndexer(ThumbnailCache cache, VideoTools video, Library
         var options = settings.Current;
         try
         {
-            var rendered = await ImageRenderer.RenderAsync(bytes, Path.GetExtension(path), options.ThumbnailHeight, options.PreviewSize, options.ThumbnailQuality, ct);
+            var rendered = await ImageRenderer.RenderAsync(bytes, Path.GetExtension(path), options.ThumbnailHeight, options.PreviewSize, options.ThumbnailQuality, ct, meta.Orientation);
             await cache.WriteAsync(facts.ContentHash, ThumbKind.Thumb, rendered.Thumb, ct);
             await cache.WriteAsync(facts.ContentHash, ThumbKind.Preview, rendered.Preview, ct);
             facts.Width = rendered.Width;

@@ -362,3 +362,30 @@ a.md-viewer__person-main:hover { background: var(--mat-surface-2); }
   .md-person__face { width: 88px; }
   .md-person-name__row { flex-direction: column; }
 }
+
+/* ---- Shared links: the page of a link (/s/{token}, no menu, the page scrolls as a whole) and the address on the page Edit ------------------------------- */
+.md-share-page { min-height: 100vh; min-height: 100dvh; display: flex; flex-direction: column; }
+.md-share-head {
+  position: sticky; top: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: var(--mat-space-3);
+  padding: var(--mat-space-3) max(var(--mat-space-4), env(safe-area-inset-right)) var(--mat-space-3) max(var(--mat-space-4), env(safe-area-inset-left));
+  padding-top: max(var(--mat-space-3), env(safe-area-inset-top));
+  background: color-mix(in srgb, var(--mat-bg) 88%, transparent); backdrop-filter: blur(12px); border-bottom: 1px solid var(--mat-border);
+}
+.md-share-head__text { min-width: 0; }
+.md-share-head__title { font-size: var(--mat-fs-xl); overflow-wrap: anywhere; }
+.md-share-head__sub { margin: 2px 0 0; color: var(--mat-text-muted); font-size: var(--mat-fs-sm); }
+.md-share-head__actions { display: flex; align-items: center; gap: var(--mat-space-1); flex: none; }
+.md-share-message { margin: var(--mat-space-4) var(--mat-space-4) 0; max-width: 70ch; white-space: pre-line; }
+.md-share-main { flex: 1; padding: var(--mat-space-4) max(var(--mat-space-4), env(safe-area-inset-right)) var(--mat-space-6) max(var(--mat-space-4), env(safe-area-inset-left)); }
+.md-share-foot { display: flex; flex-direction: column; align-items: center; gap: var(--mat-space-2); padding: var(--mat-space-4); }
+.md-share-foot .mat-footer__text { display: inline-flex; align-items: center; gap: var(--mat-space-2); }
+.md-share-foot__mark { display: inline-block; }
+.md-share-link__row { display: flex; gap: var(--mat-space-2); align-items: center; }
+.md-share-link__row .mat-input { flex: 1; min-width: 0; }
+@media (max-width: 599px) {
+  .md-share-head { flex-wrap: wrap; }
+  .md-share-head__title { font-size: var(--mat-fs-lg); }
+  .md-share-head__actions .mat-btn span { display: none; }
+  .md-share-link__row { flex-wrap: wrap; }
+  .md-share-link__row .mat-input { flex-basis: 100%; }
+}

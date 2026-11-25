@@ -881,6 +881,77 @@ namespace MatPhoto.Data.Migrations
                     b.ToTable("Person", (string)null);
                 });
 
+            modelBuilder.Entity("MatPhoto.Data.Share", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long?>("AlbumId")
+                        .HasColumnType("bigint");
+
+                    b.Property<bool>("AllowDownload")
+                        .HasColumnType("boolean");
+
+                    b.Property<long?>("CollectionId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateTime>("CreateDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<long?>("CreateUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateOnly?>("ExpiresDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime?>("LastViewedDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Message")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<long>("OwnerId")
+                        .HasColumnType("bigint");
+
+                    b.Property<string>("Title")
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
+
+                    b.Property<DateTime>("UpdateDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<short>("UpdateState")
+                        .HasColumnType("smallint");
+
+                    b.Property<long?>("UpdateUserId")
+                        .HasColumnType("bigint");
+
+                    b.Property<int>("ViewCount")
+                        .HasColumnType("integer");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AlbumId");
+
+                    b.HasIndex("CollectionId");
+
+                    b.HasIndex("OwnerId");
+
+                    b.HasIndex("Token")
+                        .IsUnique();
+
+                    b.ToTable("Share", (string)null);
+                });
+
             modelBuilder.Entity("MatPhoto.Data.Storage", b =>
                 {
                     b.Property<long>("Id")
@@ -1086,6 +1157,9 @@ namespace MatPhoto.Data.Migrations
                         .HasColumnType("character varying(300)");
 
                     b.Property<bool>("RegistrationOpen")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("SharingEnabled")
                         .HasColumnType("boolean");
 
                     b.Property<int>("SimilarThreshold")
@@ -1367,6 +1441,31 @@ namespace MatPhoto.Data.Migrations
                         .IsRequired();
 
                     b.Navigation("Media");
+                });
+
+            modelBuilder.Entity("MatPhoto.Data.Share", b =>
+                {
+                    b.HasOne("MatPhoto.Data.Album", "Album")
+                        .WithMany()
+                        .HasForeignKey("AlbumId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("MatPhoto.Data.Collection", "Collection")
+                        .WithMany()
+                        .HasForeignKey("CollectionId")
+                        .OnDelete(DeleteBehavior.Cascade);
+
+                    b.HasOne("MatPhoto.Data.User", "Owner")
+                        .WithMany()
+                        .HasForeignKey("OwnerId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Album");
+
+                    b.Navigation("Collection");
+
+                    b.Navigation("Owner");
                 });
 
             modelBuilder.Entity("MatPhoto.Data.StorageAccessEntry", b =>

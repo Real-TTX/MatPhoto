@@ -1,0 +1,85 @@
+@page "/Shares"
+@model MatPhoto.Pages.Shares.IndexModel
+@{
+    ViewData["Title"] = L["Shares.Title"].Value;
+    ViewData["PageSub"] = L["Shares.Sub"].Value;
+    ViewData["NavKey"] = "shares";
+}
+
+<div class="mat-list">
+    <partial name="_Toolbar" model="Model.Toolbar" />
+
+    @if (Model.Items.Count == 0)
+    {
+        var first = Model.Toolbar.Total == 0 && Model.Toolbar.Matching == 0;
+        <partial name="_Empty" model="@(new EmptyStateModel("link", L[first ? "Shares.Empty" : "Shares.NoMatch"].Value, L[first ? "Shares.EmptyText" : "Lists.ChangeTools"].Value, first, "/Albums", L["Albums.Title"].Value, Model.Toolbar.UrlReset()))" />
+    }
+    else
+    {
+        <md-table caption="@L["Shares.Title"]">
+            <thead>
+                <tr>
+                    <th scope="col">@L["Shares.Link"]</th>
+                    <th scope="col" class="mat-hide-sm">@L["Shares.What"]</th>
+                    <th scope="col">@L["Shares.Expires"]</th>
+                    <th scope="col" class="mat-num mat-hide-sm">@L["Shares.Views"]</th>
+                    <th scope="col" class="mat-hide-md">@L["Shares.Created"]</th>
+                    <th scope="col"><span class="mat-sr-only">@L["Common.Actions"]</span></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var s in Model.Items)
+                {
+                    <tr>
+                        <td data-label="@L["Shares.Link"]" class="mat-table__primary">
+                            <div class="mat-table__name">
+                                <span class="md-thumb">@Ui.Icon("link")</span>
+                                <span>
+                                    <a href="/Shares/Edit?id=@s.Id">@s.Title</a>
+                                    @if (!s.IsMine)
+                                    {
+                                        <small class="md-muted">@Ui.Icon("user") @s.OwnerName</small>
+                                    }
+                                    @if (s.AllowDownload)
+                                    {
+                                        <small class="md-muted">@Ui.Icon("download") @L["Shares.WithDownload"]</small>
+                                    }
+                                </span>
+                            </div>
+                        </td>
+                        <td data-label="@L["Shares.What"]" class="mat-hide-sm">
+                            @Ui.Icon(s.Target.IsAlbum ? "album" : "list") <a href="@(s.Target.IsAlbum ? "/Albums/View/" : "/Lists/View/")@s.Target.Id">@s.Target.Name</a>
+                        </td>
+                        <td data-label="@L["Shares.Expires"]">
+                            @if (s.Expired)
+                            {
+                                <span class="mat-badge mat-badge--warn">@L["Shares.Expired"]</span>
+                            }
+                            else if (s.ExpiresDate is { } until)
+                            {
+                                <span class="mat-mono">@Dates.Long(until, withYear: true)</span>
+                            }
+                            else
+                            {
+                                <span class="md-muted">@L["Shares.NoEnd"]</span>
+                            }
+                        </td>
+                        <td data-label="@L["Shares.Views"]" class="mat-num mat-mono mat-hide-sm">@s.Views</td>
+                        <td data-label="@L["Shares.Created"]" class="mat-mono mat-hide-md">@Dates.Stamp(s.CreateDate, Model.Zone)</td>
+                        <td class="mat-table__cell-actions">
+                            <div class="mat-table__actions">
+                                @if (!s.Expired)
+                                {
+                                    <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" data-copy="@Model.Address(s.Token)" aria-label="@L["Shares.CopyNamed", s.Title]" data-tip="@L["Shares.Copy"]">@Ui.Icon("copy")</button>
+                                }
+                                <a class="mat-btn mat-btn--ghost mat-btn--icon mat-btn--sm" href="/Shares/Edit?id=@s.Id" aria-label="@L["Common.EditNamed", s.Title]" data-tip="@L["Common.Edit"]">@Ui.Icon("edit")</a>
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </md-table>
+    }
+
+    <partial name="_Pager" model="Model.Pager" />
+</div>

@@ -26,4 +26,11 @@ public abstract class AppPageModel : PageModel
 
     /// <summary>The address of this page with its query (the return address of the forms on it).</summary>
     public string Here => Request.Path + Request.QueryString;
+
+    /// <summary>The address the app is reached at from outside (for links given to others): the public address of the system, else the one of this request.</summary>
+    protected async Task<string> OriginAsync()
+    {
+        var settings = await HttpContext.RequestServices.GetRequiredService<InstanceService>().SettingsAsync();
+        return string.IsNullOrWhiteSpace(settings.PublicUrl) ? $"{Request.Scheme}://{Request.Host}{Request.PathBase}" : settings.PublicUrl.TrimEnd('/');
+    }
 }

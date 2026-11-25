@@ -131,6 +131,7 @@ builder.Services.AddRazorPages(options =>
     options.Conventions.AllowAnonymousToPage("/Error");
     options.Conventions.AllowAnonymousToPage("/Account/Login");
     options.Conventions.AllowAnonymousToPage("/Account/Register");
+    options.Conventions.AllowAnonymousToPage("/Link/Index"); // a link for people without an account: /s/{token}
     options.Conventions.AuthorizeFolder("/Admin", "AdminOnly");
 }).AddMvcOptions(o =>
 {

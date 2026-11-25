@@ -488,6 +488,46 @@ public sealed class CollectionItem : Entity
     public int Position { get; set; }
 }
 
+/// <summary>
+/// A secret link (<c>/s/{Token}</c>) that shows one album or one list to people without an account: what the person who made it may see of it, while they may see it,
+/// until the link expires or is withdrawn (deleted). Nothing else of the library is reachable through it.
+/// </summary>
+public sealed class Share : SoftEntity
+{
+    /// <summary>The secret of the address: 32 characters of base64url (24 random bytes).</summary>
+    public string Token { get; set; } = string.Empty;
+
+    public long OwnerId { get; set; }
+
+    public User? Owner { get; set; }
+
+    /// <summary>The album shared, or null when it is a list.</summary>
+    public long? AlbumId { get; set; }
+
+    public Album? Album { get; set; }
+
+    /// <summary>The list shared, or null when it is an album.</summary>
+    public long? CollectionId { get; set; }
+
+    public Collection? Collection { get; set; }
+
+    /// <summary>The title the visitors see; null = the name of the album or the list.</summary>
+    public string? Title { get; set; }
+
+    /// <summary>A few words for the visitors (shown under the title).</summary>
+    public string? Message { get; set; }
+
+    /// <summary>The last day the link works (in the time zone of the person who made it); null = until it is withdrawn.</summary>
+    public DateOnly? ExpiresDate { get; set; }
+
+    /// <summary>The visitors may download the originals (one by one and all as a ZIP); without it they see the previews and play the videos.</summary>
+    public bool AllowDownload { get; set; }
+
+    public int ViewCount { get; set; }
+
+    public DateTime? LastViewedDate { get; set; }
+}
+
 /// <summary>Two photos a person said are not duplicates of each other (they are not offered again).</summary>
 public sealed class DuplicateDismissal : Entity
 {
@@ -733,4 +773,7 @@ public sealed class SystemSetting : Entity
 
     /// <summary>Faces are looked for and grouped into people (on this server; off until an administrator switches it on: faces are biometric data).</summary>
     public bool FacesEnabled { get; set; }
+
+    /// <summary>People may share an album or a list by a secret link with people without an account (on by default; off: every link stops working).</summary>
+    public bool SharingEnabled { get; set; } = true;
 }

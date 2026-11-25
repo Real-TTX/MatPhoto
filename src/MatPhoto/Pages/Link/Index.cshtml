@@ -1,0 +1,21 @@
+@page "/s/{token}"
+@model MatPhoto.Pages.Link.IndexModel
+@{
+    Layout = "_LayoutShare";
+    var v = Model.View;
+    ViewData["Title"] = v.Title;
+    ViewData["PageSub"] = Model.Sub;
+    ViewData["ShareMessage"] = v.Message;
+}
+@section Actions {
+    @if (v.AllowDownload && Model.Count > 0)
+    {
+        <a class="mat-btn mat-btn--secondary" href="/s/@v.Token/zip" download>@Ui.Icon("download")<span>@L["Share.DownloadAll"]</span></a>
+    }
+}
+
+<partial name="_PhotoGrid" model="@(new GridModel(v.Scope.ToString(), v.Title, Model.IsList ? "list" : "album", L["Share.Empty"].Value, L["Share.EmptyText"].Value) { Share = v.Token, Download = v.AllowDownload, Days = !Model.IsList })" />
+
+@section Scripts {
+    <script type="module" src="~/js/photos.js" asp-append-version="true"></script>
+}

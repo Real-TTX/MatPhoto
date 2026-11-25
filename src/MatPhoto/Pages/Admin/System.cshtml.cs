@@ -27,6 +27,8 @@ public sealed class SystemModel(InstanceService instance, MailService mail, AppD
 
     [BindProperty] public bool RegistrationOpen { get; set; }
 
+    [BindProperty] public bool SharingEnabled { get; set; }
+
     [BindProperty] public string PublicUrl { get; set; } = string.Empty;
 
     [BindProperty] public long MaxUploadMb { get; set; }
@@ -82,6 +84,7 @@ public sealed class SystemModel(InstanceService instance, MailService mail, AppD
         Tab = Tabs.Contains(Tab) ? Tab : "general";
         var s = await instance.SettingsAsync();
         RegistrationOpen = s.RegistrationOpen;
+        SharingEnabled = s.SharingEnabled;
         PublicUrl = s.PublicUrl ?? string.Empty;
         MaxUploadMb = s.MaxUploadBytes / Mb;
         CacheStorageId = s.CacheStorageId?.ToString(System.Globalization.CultureInfo.InvariantCulture) ?? string.Empty;
@@ -111,7 +114,7 @@ public sealed class SystemModel(InstanceService instance, MailService mail, AppD
             "import" => new SettingsChange(AlbumDateFormat: AlbumDateFormat.Trim(), ImportGapHours: ImportGapHours, ImportDistanceKm: ImportDistanceKm,
                 ImportStorageId: long.TryParse(ImportStorageId, out var i) ? i : 0, ImportFolder: ImportFolder, SimilarThreshold: SimilarThreshold),
             "people" => new SettingsChange(FacesEnabled: FacesEnabled),
-            _ => new SettingsChange(RegistrationOpen: RegistrationOpen, PublicUrl: PublicUrl, MaxUploadBytes: Math.Max(0, MaxUploadMb) * Mb),
+            _ => new SettingsChange(RegistrationOpen: RegistrationOpen, SharingEnabled: SharingEnabled, PublicUrl: PublicUrl, MaxUploadBytes: Math.Max(0, MaxUploadMb) * Mb),
         };
         if (await instance.SaveSettingsAsync(change) is { } problem)
         {

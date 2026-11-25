@@ -43,7 +43,8 @@ public sealed record SystemSettings(
     string ImportFolder,
     int SimilarThreshold,
     long MaxUploadBytes,
-    bool FacesEnabled);
+    bool FacesEnabled,
+    bool SharingEnabled);
 
 /// <summary>What the housekeeping removed.</summary>
 public sealed record CleanUpResult(int Sessions, int Imports, int Files);
@@ -137,7 +138,8 @@ public sealed class InstanceService(AppDbContext db, AccountService accounts, Ma
     {
         var s = await accounts.SettingsAsync();
         return new SystemSettings(s.RegistrationOpen, PublicUrlOf(s, platform), platform.AppPublicUrl is not null, s.CacheStorageId, s.CacheFolder, s.ThumbnailHeight, s.PreviewSize,
-            s.ThumbnailQuality, s.AlbumDateFormat, s.ImportGapHours, s.ImportDistanceKm, s.ImportStorageId, s.ImportFolder, s.SimilarThreshold, s.MaxUploadBytes, s.FacesEnabled);
+            s.ThumbnailQuality, s.AlbumDateFormat, s.ImportGapHours, s.ImportDistanceKm, s.ImportStorageId, s.ImportFolder, s.SimilarThreshold, s.MaxUploadBytes, s.FacesEnabled,
+            s.SharingEnabled);
     }
 
     /// <summary>
@@ -252,6 +254,7 @@ public sealed class InstanceService(AppDbContext db, AccountService accounts, Ma
         s.SimilarThreshold = change.SimilarThreshold ?? s.SimilarThreshold;
         s.MaxUploadBytes = change.MaxUploadBytes ?? s.MaxUploadBytes;
         s.FacesEnabled = change.FacesEnabled ?? s.FacesEnabled;
+        s.SharingEnabled = change.SharingEnabled ?? s.SharingEnabled;
         await db.SaveChangesAsync();
         library.Reload(s);
 
@@ -339,4 +342,5 @@ public sealed record SettingsChange(
     string? ImportFolder = null,
     int? SimilarThreshold = null,
     long? MaxUploadBytes = null,
-    bool? FacesEnabled = null);
+    bool? FacesEnabled = null,
+    bool? SharingEnabled = null);

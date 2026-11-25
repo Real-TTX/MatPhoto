@@ -1,0 +1,54 @@
+@page "/Shares/Edit"
+@model MatPhoto.Pages.Shares.EditModel
+@{
+    ViewData["Title"] = Model.Heading;
+    ViewData["Width"] = "narrow";
+    ViewData["NavKey"] = "shares";
+    ViewData["Crumbs"] = new List<(string, string?)> { (L["Shares.Title"].Value, "/Shares"), (Model.IsNew ? L["Common.New"].Value : Model.Heading, null) };
+    var s = Model.Share;
+}
+
+@if (s is not null)
+{
+    if (s.Expired)
+    {
+        <div class="mat-alert mat-alert--warning" role="status">@Ui.Icon("alert")<div class="mat-alert__body"><strong>@L["Shares.Expired"]</strong> @L["Shares.ExpiredText"]</div></div>
+    }
+    <div class="mat-card md-share-link">
+        <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("link")@L["Shares.Link"]</h2></div>
+        <div class="mat-card__body mat-form">
+            <div class="mat-field">
+                <label class="mat-label" for="share-address">@L["Shares.Address"]</label>
+                <div class="md-share-link__row">
+                    <input class="mat-input mat-mono" id="share-address" value="@Model.Address" readonly />
+                    <button type="button" class="mat-btn mat-btn--primary" data-copy="#share-address">@Ui.Icon("copy")<span>@L["Shares.Copy"]</span></button>
+                    <a class="mat-btn mat-btn--secondary mat-btn--icon" href="@Model.Address" target="_blank" rel="noopener" aria-label="@L["Shares.Open"]" data-tip="@L["Shares.Open"]">@Ui.Icon("external")</a>
+                </div>
+                <span class="mat-hint">@L["Shares.AddressHint"]</span>
+            </div>
+            <p class="md-muted">
+                @Ui.Icon(s.Target.IsAlbum ? "album" : "list") <a href="@Model.TargetUrl">@s.Target.Name</a>
+                · @L["Shares.ViewsText", s.Views]@if (s.LastViewed is { } seen) { <text> · @L["Shares.LastViewed", Dates.Stamp(seen, Model.Zone)]</text> }
+                @if (!s.IsMine) { <text> · @L["Shares.By", s.OwnerName]</text> }
+            </p>
+        </div>
+    </div>
+}
+
+<form class="mat-form" method="post" novalidate>
+    <partial name="_FormSummary" model="ViewData.ModelState" />
+    <div class="mat-card">
+        <div class="mat-card__body mat-form">
+            @if (s is null)
+            {
+                <p class="mat-hint">@L["Shares.What.Text", Model.Target.Name]</p>
+            }
+            <md-field name="Title" label="@L["Shares.TitleField"]" value="@Model.Title" maxlength="200" optional placeholder="@Model.Target.Name" hint="@L["Shares.TitleHint"]" disabled="@Model.ReadOnly" />
+            <md-field name="Message" kind="textarea" label="@L["Shares.Message"]" value="@Model.Message" rows="3" maxlength="2000" optional hint="@L["Shares.MessageHint"]" disabled="@Model.ReadOnly" />
+            <md-field name="ExpiresDate" kind="date" label="@L["Shares.ExpiresField"]" value="@Model.ExpiresDate" optional min="@Model.MinDate" placeholder="@L["Shares.NoEnd"]" hint="@L["Shares.ExpiresHint"]" disabled="@Model.ReadOnly" />
+            <md-field name="AllowDownload" kind="switch" label="@L["Shares.AllowDownload"]" value="@Model.AllowDownload.ToString()" hint="@L["Shares.AllowDownloadHint"]" disabled="@Model.ReadOnly" />
+        </div>
+    </div>
+    <md-buttons save="@(Model.ReadOnly ? null : L[Model.IsNew ? "Shares.Create" : "Common.Save"].Value)" save-icon="@(Model.IsNew ? "link" : "save")" back="@(Model.IsNew ? Model.TargetUrl : "/Shares")"
+                delete-handler="@(Model.IsNew ? null : "Delete")" delete-label="@L["Shares.Withdraw"]" delete-confirm="@L["Shares.WithdrawConfirm", Model.Heading]" delete-ok="@L["Shares.Withdraw"]" />
+</form>

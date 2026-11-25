@@ -1,9 +1,12 @@
 @model MatPhoto.Pages.GridModel
 @*
     The photo grid (the special UI of the app, built on the toolkit): months with their days, the photos in justified rows like a photo book, loaded month by month
-    while scrolling (wwwroot/js/photos.js), the selection with its bar, and the viewer. Everything the grid shows comes from /live/timeline and /live/items.
+    while scrolling (wwwroot/js/photos.js), the selection with its bar, and the viewer. Everything the grid shows comes from /live/timeline and /live/items;
+    on the page of a link (Share) from /s/{token}/… and without the selection.
 *@
-<div class="md-grid" data-photo-grid data-scope="@Model.Scope" data-list="@Model.ListId" data-album="@Model.AlbumId" data-days="@(Model.Days ? "1" : "0")">
+<div class="md-grid" data-photo-grid data-scope="@Model.Scope" data-list="@Model.ListId" data-album="@Model.AlbumId" data-days="@(Model.Days ? "1" : "0")" data-share="@Model.Share" data-download="@(Model.Download ? "1" : "0")">
+    @if (Model.Share is null)
+    {
     <div class="md-selbar mat-bulk" data-selbar role="toolbar" aria-label="@L["Grid.Selection"]" hidden>
         <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon" data-sel-clear aria-label="@L["Grid.ClearSelection"]" data-tip="@L["Grid.ClearSelection"]">@Ui.Icon("x")</button>
         <span class="mat-bulk__count" data-sel-count aria-live="polite"></span>
@@ -15,6 +18,7 @@
         }
         <button type="button" class="mat-btn mat-btn--ghost mat-btn--icon md-selbar__danger" data-sel-action="trash" aria-label="@L["Grid.Trash"]" data-tip="@L["Grid.Trash"]">@Ui.Icon("trash")</button>
     </div>
+    }
 
     <p class="md-grid__status" data-grid-status aria-live="polite"><span class="mat-spinner mat-spinner--sm" aria-hidden="true"></span><span>@L["Grid.Loading"]</span></p>
     <div class="md-grid__canvas" data-grid-canvas role="list" aria-label="@Model.Label"></div>

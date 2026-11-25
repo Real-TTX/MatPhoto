@@ -12,4 +12,10 @@ public sealed record GridModel(string Scope, string Label, string EmptyIcon, str
 
     /// <summary>Days get a head of their own (the timeline, an album); a list keeps its order without them.</summary>
     public bool Days { get; init; } = true;
+
+    /// <summary>The token of a link (the page <c>/s/{token}</c>): the grid reads from the link, without selection, favourites, lists or the trash.</summary>
+    public string? Share { get; init; }
+
+    /// <summary>The visitors of the link may download the originals.</summary>
+    public bool Download { get; init; }
 }

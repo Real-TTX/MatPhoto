@@ -6,6 +6,7 @@ using MatPhoto.Localization;
 using MatPhoto.Services.Storages;
 using Microsoft.AspNetCore.Antiforgery;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Net.Http.Headers;
 
 namespace MatPhoto.Services.Library;
@@ -94,43 +95,71 @@ public static class LibraryEndpoints
                 : await OriginalAsync(http, connections, file.Storage, file.Path, file.FileName, file.MimeType, file.Size, file.Modified, download: false);
         });
 
+        // ---- a link for people without an account (/s/{token}): the grid, the viewer, the pictures, the originals and the ZIP of one album or list --------------
+        var shared = app.MapGroup("/s/{token}").AllowAnonymous();
+        shared.MapGet("/live/timeline", async (string token, HttpContext http, AppDbContext db, LibrarySettings settings, IMemoryCache memory) =>
+            await OpenShareAsync(token, http, db, settings, memory) is { } view
+                ? Timeline(await LibraryService.BucketsAsync(db, view.OwnerId, view.Scope, http.RequestAborted))
+                : Results.NotFound());
+
+        shared.MapGet("/live/items", async (string token, string? bucket, int? offset, int? limit, HttpContext http, AppDbContext db, LibrarySettings settings, IMemoryCache memory) =>
+            await OpenShareAsync(token, http, db, settings, memory) is { } view
+                ? Items(await LibraryService.ItemsAsync(db, view.OwnerId, view.Scope, bucket ?? string.Empty, offset ?? 0, limit ?? 500, http.RequestAborted), favorites: false)
+                : Results.NotFound());
+
+        shared.MapGet("/live/media/{id:long}", async (string token, long id, HttpContext http, AppDbContext db, LibrarySettings settings, IMemoryCache memory) =>
+        {
+            if (await OpenShareAsync(token, http, db, settings, memory) is not { } view || await ShareService.FileAsync(db, view, id, http.RequestAborted) is null)
+            {
+                return Results.NotFound();
+            }
+
+            var d = await LibraryService.DetailAsync(db, view.OwnerId, id, http.RequestAborted);
+            return d is null ? Results.NotFound() : Results.Json(Describe(d, view), Json);
+        });
+
+        shared.MapGet("/media/{id:long}/thumb", (string token, long id, HttpContext http, AppDbContext db, LibrarySettings settings, IMemoryCache memory, ThumbnailCache cache)
+            => SharedPicture(token, id, ThumbKind.Thumb, http, db, settings, memory, cache));
+        shared.MapGet("/media/{id:long}/preview", (string token, long id, HttpContext http, AppDbContext db, LibrarySettings settings, IMemoryCache memory, ThumbnailCache cache)
+            => SharedPicture(token, id, ThumbKind.Preview, http, db, settings, memory, cache));
+
+        // the original: a video always plays; a photo in full size and every download only when the link allows downloads
+        shared.MapMethods("/media/{id:long}/original", ["GET", "HEAD"], async (string token, long id, bool? download, HttpContext http, AppDbContext db, LibrarySettings settings,
+            IMemoryCache memory, StorageConnections connections) =>
+        {
+            if (await OpenShareAsync(token, http, db, settings, memory) is not { } view || await ShareService.FileAsync(db, view, id, http.RequestAborted) is not { } file
+                || (!view.AllowDownload && (download == true || file.Type != MediaType.Video)))
+            {
+                return Results.NotFound();
+            }
+
+            return await OriginalAsync(http, connections, file.Storage, file.Path, file.FileName, file.MimeType, file.Size, file.Modified, download == true);
+        });
+
+        shared.MapGet("/zip", async (string token, HttpContext http, AppDbContext db, LibrarySettings settings, IMemoryCache memory, StorageConnections connections) =>
+        {
+            if (await OpenShareAsync(token, http, db, settings, memory) is not { AllowDownload: true } view)
+            {
+                return Results.NotFound();
+            }
+
+            await ZipAsync(http, connections, view.Title, await ShareService.FilesAsync(db, view, http.RequestAborted));
+            return Results.Empty;
+        });
+
         // ---- the JSON of the grids and the viewer ----------------------------------------------------------------------------------
         var live = app.MapGroup("/live").AddEndpointFilter(Antiforgery);
 
         live.MapGet("/timeline", async (string? scope, AppDbContext db, CurrentUser me, CancellationToken ct) =>
-        {
-            var buckets = await LibraryService.BucketsAsync(db, me.RequiredId, MediaScope.Parse(scope), ct);
-            return buckets is null ? Results.NotFound() : Results.Json(new
-            {
-                buckets = buckets.Select(b => new { k = b.Key, y = b.Year, m = b.Month, n = b.Count, label = BucketLabel(b) }),
-                total = buckets.Sum(b => b.Count),
-            }, Json);
-        });
+            Timeline(await LibraryService.BucketsAsync(db, me.RequiredId, MediaScope.Parse(scope), ct)));
 
         live.MapGet("/items", async (string? scope, string? bucket, int? offset, int? limit, AppDbContext db, CurrentUser me, CancellationToken ct) =>
-        {
-            var items = await LibraryService.ItemsAsync(db, me.RequiredId, MediaScope.Parse(scope), bucket ?? string.Empty, offset ?? 0, limit ?? 500, ct);
-            return items is null ? Results.NotFound() : Results.Json(new
-            {
-                items = items.Select(i => new
-                {
-                    i = i.Id,
-                    w = i.Width,
-                    h = i.Height,
-                    k = i.Hash.Length >= 12 ? i.Hash[..12] : i.Hash,
-                    v = i.Type == MediaType.Video ? Math.Max(1, i.DurationMs ?? 1) : 0,
-                    l = i.Live ? 1 : 0,
-                    f = i.Favorite ? 1 : 0,
-                    t = i.HasThumb ? 1 : 0,
-                    d = i.Date.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture),
-                }),
-            }, Json);
-        });
+            Items(await LibraryService.ItemsAsync(db, me.RequiredId, MediaScope.Parse(scope), bucket ?? string.Empty, offset ?? 0, limit ?? 500, ct), favorites: true));
 
         live.MapGet("/media/{id:long}", async (long id, AppDbContext db, CurrentUser me, CancellationToken ct) =>
         {
             var d = await LibraryService.DetailAsync(db, me.RequiredId, id, ct);
-            return d is null ? Results.NotFound() : Results.Json(Describe(d), Json);
+            return d is null ? Results.NotFound() : Results.Json(Describe(d, null), Json);
         });
 
         live.MapPost("/media/favorite", async (IdsRequest body, AppDbContext db, CurrentUser me, CancellationToken ct) =>
@@ -363,18 +392,27 @@ public static class LibraryEndpoints
     private static async Task<IResult> Picture(long id, ThumbKind kind, HttpContext http, AppDbContext db, CurrentUser me, ThumbnailCache cache)
     {
         var media = await LibraryService.FindAsync(db, me.RequiredId, id, http.RequestAborted);
-        if (media is null)
-        {
-            return Results.NotFound();
-        }
+        return media is null ? Results.NotFound() : await PictureAsync(media.ContentHash, kind, http, cache);
+    }
 
-        var etag = new EntityTagHeaderValue($"\"{media.ContentHash}{(kind == ThumbKind.Thumb ? "t" : "p")}\"");
+    /// <summary>A thumbnail or a preview of a photo of a link (only of the album or the list it shows).</summary>
+    private static async Task<IResult> SharedPicture(string token, long id, ThumbKind kind, HttpContext http, AppDbContext db, LibrarySettings settings, IMemoryCache memory,
+        ThumbnailCache cache)
+    {
+        var view = await OpenShareAsync(token, http, db, settings, memory);
+        var file = view is null ? null : await ShareService.FileAsync(db, view, id, http.RequestAborted);
+        return file is null ? Results.NotFound() : await PictureAsync(file.Hash, kind, http, cache);
+    }
+
+    private static async Task<IResult> PictureAsync(string hash, ThumbKind kind, HttpContext http, ThumbnailCache cache)
+    {
+        var etag = new EntityTagHeaderValue($"\"{hash}{(kind == ThumbKind.Thumb ? "t" : "p")}\"");
         if (http.Request.Headers.IfNoneMatch.ToString().Contains(etag.Tag.ToString(), StringComparison.Ordinal))
         {
             return Results.StatusCode(StatusCodes.Status304NotModified);
         }
 
-        var data = media.ContentHash.Length > 0 ? await cache.ReadAsync(media.ContentHash, kind, http.RequestAborted) : null;
+        var data = hash.Length > 0 ? await cache.ReadAsync(hash, kind, http.RequestAborted) : null;
         if (data is null)
         {
             return Results.NotFound();
@@ -504,9 +542,105 @@ public static class LibraryEndpoints
         return Results.Empty;
     }
 
-    // ---- what the viewer shows ---------------------------------------------------------------------------------------------------------
+    // ---- links -----------------------------------------------------------------------------------------------------------------------
 
-    private static object Describe(MediaDetail d)
+    /// <summary>
+    /// The link of a request of a visitor, kept 30 seconds in memory (a grid asks for hundreds of thumbnails); a link that does not open is not kept, and a change or
+    /// the withdrawal of a link forgets it at once (<see cref="ForgetShare"/>).
+    /// </summary>
+    private static async Task<SharedView?> OpenShareAsync(string token, HttpContext http, AppDbContext db, LibrarySettings settings, IMemoryCache memory)
+    {
+        http.Response.Headers["X-Robots-Tag"] = "noindex, nofollow";
+        if (!settings.Current.SharingEnabled || !ShareService.IsToken(token))
+        {
+            return null;
+        }
+
+        var key = "share:" + token;
+        if (memory.TryGetValue(key, out SharedView? kept) && kept is not null)
+        {
+            return kept;
+        }
+
+        var view = await ShareService.OpenAsync(db, token, true, http.RequestAborted);
+        if (view is not null)
+        {
+            memory.Set(key, view, TimeSpan.FromSeconds(30));
+        }
+
+        return view;
+    }
+
+    /// <summary>Forgets what is kept of a link (after it was changed or withdrawn).</summary>
+    public static void ForgetShare(IMemoryCache memory, string token) => memory.Remove("share:" + token);
+
+    /// <summary>
+    /// Every file of a link as one ZIP, streamed while it is read from the storages (stored, not compressed: photos and videos are compressed already). Two files of
+    /// the same name get " (2)"; a file that cannot be read is left out.
+    /// </summary>
+    private static async Task ZipAsync(HttpContext http, StorageConnections connections, string title, IReadOnlyList<SharedFile> files)
+    {
+        var ct = http.RequestAborted;
+        var name = string.Concat(title.Select(c => Path.GetInvalidFileNameChars().Contains(c) || c is '/' or '\\' or ':' or '*' or '?' or '"' or '<' or '>' or '|' ? '_' : c)).Trim();
+        http.Response.ContentType = "application/zip";
+        http.Response.Headers.ContentDisposition = new ContentDispositionHeaderValue("attachment") { FileNameStar = (name.Length == 0 ? "MatPhoto" : name) + ".zip" }.ToString();
+        http.Response.Headers.CacheControl = "no-store";
+        if (http.Features.Get<Microsoft.AspNetCore.Http.Features.IHttpBodyControlFeature>() is { } body)
+        {
+            body.AllowSynchronousIO = true; // the end of the archive may be written without await
+        }
+
+        var used = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        await using var zip = await System.IO.Compression.ZipArchive.CreateAsync(http.Response.Body, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true, entryNameEncoding: null, ct);
+        foreach (var file in files)
+        {
+            var entryName = file.FileName;
+            for (var n = 2; !used.Add(entryName); n++)
+            {
+                entryName = $"{Path.GetFileNameWithoutExtension(file.FileName)} ({n}){Path.GetExtension(file.FileName)}";
+            }
+
+            try
+            {
+                await using var source = await connections.Create(file.Storage).OpenReadAsync(file.Path, 0, ct);
+                var entry = zip.CreateEntry(entryName, System.IO.Compression.CompressionLevel.NoCompression);
+                entry.LastWriteTime = new DateTimeOffset(DateTime.SpecifyKind(file.Modified, DateTimeKind.Utc));
+                await using var target = await entry.OpenAsync(ct);
+                await source.CopyToAsync(target, ct);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                StorageErrors.Log?.LogWarning(ex, "A file of a link could not be read for the ZIP: {Path}", file.Path);
+            }
+        }
+    }
+
+    // ---- what the grids and the viewer show ------------------------------------------------------------------------------------------------
+
+    private static IResult Timeline(IReadOnlyList<TimelineBucket>? buckets) => buckets is null ? Results.NotFound() : Results.Json(new
+    {
+        buckets = buckets.Select(b => new { k = b.Key, y = b.Year, m = b.Month, n = b.Count, label = BucketLabel(b) }),
+        total = buckets.Sum(b => b.Count),
+    }, Json);
+
+    private static IResult Items(IReadOnlyList<GridItem>? items, bool favorites) => items is null ? Results.NotFound() : Results.Json(new
+    {
+        items = items.Select(i => new
+        {
+            i = i.Id,
+            w = i.Width,
+            h = i.Height,
+            k = i.Hash.Length >= 12 ? i.Hash[..12] : i.Hash,
+            v = i.Type == MediaType.Video ? Math.Max(1, i.DurationMs ?? 1) : 0,
+            l = i.Live ? 1 : 0,
+            f = favorites && i.Favorite ? 1 : 0,
+            t = i.HasThumb ? 1 : 0,
+            d = i.Date.ToString("yyyy-MM-dd'T'HH:mm", CultureInfo.InvariantCulture),
+        }),
+    }, Json);
+
+    /// <summary>The info of the viewer; for a visitor of a link (<paramref name="share"/>) without the place, the album, the people and anything of the person who shared it.</summary>
+    private static object Describe(MediaDetail d, SharedView? share)
     {
         var culture = CultureInfo.CurrentUICulture;
         var rows = new List<object>();
@@ -537,7 +671,7 @@ public static class LibraryEndpoints
         var size = d.Width > 0 ? $"{d.Width} × {d.Height}" + (d.Type == MediaType.Photo ? $" · {Math.Round(d.Width * (double)d.Height / 1_000_000, 1).ToString(culture)} MP" : string.Empty) : null;
         Row(d.Type == MediaType.Video ? "video" : "image", d.FileName, string.Join(" · ", new[] { size, Ui.Bytes(d.Size) }.Where(s => s is not null)),
             d.DurationMs is { } ms ? TimeSpan.FromMilliseconds(ms).ToString(ms >= 3_600_000 ? @"h\:mm\:ss" : @"m\:ss", culture) + (d.VideoCodec is null ? string.Empty : " · " + d.VideoCodec.ToUpperInvariant()) : null);
-        if (d.City is not null || d.Latitude is not null)
+        if (share is null && (d.City is not null || d.Latitude is not null))
         {
             var place = string.Join(", ", new[] { d.City, d.Region, d.CountryCode is null ? null : GeoPlaces.CountryName(d.CountryCode, d.Country) }.Where(s => !string.IsNullOrWhiteSpace(s)).Distinct());
             var position = d.Latitude is { } lat && d.Longitude is { } lon
@@ -547,7 +681,11 @@ public static class LibraryEndpoints
                 d.CountryCode is null ? null : "/Explore/View?scope=" + Uri.EscapeDataString(d.City is null ? $"place:{d.CountryCode}" : $"place:{d.CountryCode}/{d.City}"));
         }
 
-        Row("album", Text.T("Viewer.Album"), d.AlbumName, d.StorageName + " · " + d.Path, "/Albums/View/" + d.AlbumId.ToString(CultureInfo.InvariantCulture));
+        if (share is null)
+        {
+            Row("album", Text.T("Viewer.Album"), d.AlbumName, d.StorageName + " · " + d.Path, "/Albums/View/" + d.AlbumId.ToString(CultureInfo.InvariantCulture));
+        }
+
         var traits = Enum.GetValues<MediaTraits>().Where(t => t is not MediaTraits.None and not MediaTraits.LiveVideo && d.Traits.HasFlag(t)).Select(t => Text.T("Viewer.Trait." + t)).ToList();
         Row("tag", Text.T("Viewer.Recognised"), string.Join(", ", traits));
         return new
@@ -560,13 +698,14 @@ public static class LibraryEndpoints
             height = d.Height,
             hash = d.Hash.Length >= 12 ? d.Hash[..12] : d.Hash,
             hasThumb = d.HasThumb,
-            favorite = d.Favorite,
-            canEdit = d.CanEdit,
+            favorite = share is null && d.Favorite,
+            canEdit = share is null && d.CanEdit,
+            canDownload = share?.AllowDownload ?? true,
             live = d.LiveVideoId,
             browserCanShow = d.BrowserCanShow,
-            albumId = d.AlbumId,
-            lists = d.Lists.Select(l => new { id = l.Id, name = l.Name }),
-            people = d.People.Select(p => new
+            albumId = share is null ? d.AlbumId : 0,
+            lists = share is null ? d.Lists.Select(l => new { id = l.Id, name = l.Name }) : [],
+            people = (share is null ? d.People : []).Select(p => new
             {
                 id = p.Id,
                 name = p.Name ?? (p.Id is null ? Text.T("People.WhoIsThis") : Text.T("People.Unnamed")),

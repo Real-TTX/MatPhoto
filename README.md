@@ -13,13 +13,14 @@ PostgreSQL, part of the Mat family.
 | **Storages as the library** | Folders of the server and shares of a NAS are scanned and kept in step (new, changed, moved and removed files). Folders a NAS keeps for itself (`@eaDir`, `#recycle` …) are left out. |
 | **Albums are folders** | Every folder with photos is an album. A new album makes a folder, renaming it renames the folder, "delete" moves it into `.matphoto-trash` of the storage. |
 | **Lists** | Photos of any album put together for a project ("Girlande Max Geburtstag") – links only, shared with everybody if you like. |
+| **Shared links** | An album or a list for people without an account: a secret link with a title and a few words, a last day if you like, downloads (one by one and all as a ZIP) only when you allow them; withdrawn with one click. The visitors see the grid and the viewer without the place, the folder or the people (an original they download keeps what is in the file). An administrator can switch sharing off (*System → General*). |
 | **The grid** | Every photo and video month by month and day by day in justified rows, endless scrolling (only what is near the screen is in the page), a year bar, selection of ranges and whole days. |
 | **The viewer** | Full screen on black, the next photos loaded ahead, keys and swipes, zoom, slideshow, videos with seeking, Live Photos, the info (date, camera, exposure, place, album). |
-| **Thumbnails and cache** | Made once with ImageMagick (JPEG, HEIC, PNG, WebP, AVIF, TIFF, RAW) and ffmpeg (videos), kept in the data volume or a folder of a storage (your NAS), keyed by the content. |
-| **People** | Faces are found and grouped into people on the server itself (YuNet and SFace of the OpenCV model zoo, ONNX Runtime on the CPU – no cloud, no graphics card): name them ("who is this?"), join two groups of the same person, take a face away, search by name; the viewer shows who is on a photo. Off until an administrator switches it on (*System → People*). |
+| **Thumbnails and cache** | Made once with ImageMagick (JPEG, HEIC, PNG, WebP, AVIF, TIFF) and ffmpeg (videos); a camera RAW (DNG, CR2, CR3, NEF, ARW, ORF, RW2, RAF and older ones like CRW or RAW) shows the picture the camera put into it, developed with LibRaw only when it has none – kept in the data volume or a folder of a storage (your NAS), keyed by the content. |
+| **People** | Faces are found and grouped into people on the server itself (YuNet and SFace of the OpenCV model zoo, ONNX Runtime on the CPU – no cloud, no graphics card): name them ("who is this?"), join two groups of the same person, take a face away or split a group by naming the faces ticked, search by name; the viewer shows who is on a photo and names a single face ("nobody" hides one in the background). Off until an administrator switches it on (*System → People*). |
 | **Explore** | Automatic albums: places (found offline from the positions), videos, screenshots, selfies, panoramas, Live Photos, animations, RAW, years, cameras. |
 | **Duplicates** | The same file twice and similar pictures (another size, a burst), side by side: keep one, the rest goes into the trash folder. |
-| **Smart import** | Upload files or whole folders, or name a folder of a storage (the inbox your phone syncs to): dates, places and duplicates are recognised, albums suggested by time, place and folder, then copied or moved. |
+| **Smart import** | Upload files or whole folders, or name a folder of a storage (the inbox your phone syncs to): dates, places and duplicates are recognised, albums suggested by time, place and folder, then copied or moved. A library imported into itself (a NAS connected anew) is sorted in place: moved, never copied, and the folders left empty go into the trash folder. |
 | **PWA** | Installable, works on phones (safe areas, no zoom on fields), the last grids and thumbnails offline. |
 
 | | |
@@ -42,6 +43,10 @@ The first account that registers is the administrator. Then **Administration →
 
 The first scan starts at once (Administration → Scans shows how far it is). *Administration → System → Thumbnails* chooses where the cache lies (the data volume or
 a folder of a storage), *→ Import* how new albums are named and grouped.
+
+Who sees what is the tab **Access** of a storage: everybody may look at a new one, the administrator who added it is an *Editor* (import, albums, trash). Being an
+administrator alone gives no role on the photos – the import needs an Editor of a library storage. A folder you only want to import from (the old photos you copy
+in bit by bit) is a storage with *Scan* off: **Import → From a storage** reads it, *Move the files* empties it.
 
 | File | Branch / image | Extra |
 |---|---|---|
@@ -71,7 +76,6 @@ connected by **Mattiverse** or by their variables), the launcher *Photos* with q
 ## Not yet
 
 - Transcoding of videos the browser cannot play (HEVC in some browsers, MKV, AVI): they are downloaded instead.
-- Sharing albums by link with people without an account.
 
 ## Credits
 

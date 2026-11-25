@@ -1,5 +1,6 @@
 @page "/Lists/View/{id:long}"
 @model MatPhoto.Pages.Lists.ViewModel
+@inject MatPhoto.Services.Library.LibrarySettings Library
 @{
     var c = Model.List;
     ViewData["Title"] = c.Name;
@@ -10,6 +11,10 @@
 }
 @section TopActions {
     <partial name="_GridZoom" />
+    @if (Library.Current.SharingEnabled)
+    {
+        <a class="mat-btn mat-btn--ghost mat-btn--icon" href="/Shares/Edit?list=@c.Id" aria-label="@L["Shares.ShareList"]" data-tip="@L["Shares.ShareList"]">@Ui.Icon("link")</a>
+    }
     @if (c.IsMine)
     {
         <a class="mat-btn mat-btn--ghost mat-btn--icon" href="/Lists/Edit?id=@c.Id" aria-label="@L["Lists.Edit"]" data-tip="@L["Lists.Edit"]">@Ui.Icon("edit")</a>

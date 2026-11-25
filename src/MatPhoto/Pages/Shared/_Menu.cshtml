@@ -1,11 +1,12 @@
 @model (MenuModel Menu, string Area)
 @inject CurrentUser Me
+@inject MatPhoto.Services.Library.LibrarySettings Library
 @*
     The menus (SHELL-01 .. SHELL-19): one panel per menu of the switcher at the foot (SHELL-15), the one of the page shown.
-    - photos:   Import (the main action), Photos, Explore, People (when the recognition is on), Albums, Favourites, Duplicates, Imports, the lists of the person
+    - photos:   Import (the main action), Photos, Explore, People (when the recognition is on), Albums, Favourites, Duplicates, Imports, Shared links (when sharing is on), the lists of the person
     - settings: profile, password, my data
     - admin:    users, storages, scans, connections, activity, system (administrators only)
-    A page names what it shows: ViewData["NavKey"] ("photos", "explore", "people", "albums", "favorites", "duplicates", "imports", "list-4").
+    A page names what it shows: ViewData["NavKey"] ("photos", "explore", "people", "albums", "favorites", "duplicates", "imports", "shares", "list-4").
 *@
 @{
     var m = Model.Menu;
@@ -40,6 +41,10 @@
                 }
             </a>
         </li>
+        @if (Library.Current.SharingEnabled)
+        {
+            <li><a class="@Cls(key == "shares")" href="/Shares" aria-current="@Cur(key == "shares")">@Ui.Icon("link")<span>@L["Shares.Title"]</span></a></li>
+        }
 
         <li class="mat-nav__group mat-nav__group--action" role="presentation">
             <span class="mat-nav__group-title">@L["Lists.Title"]</span>

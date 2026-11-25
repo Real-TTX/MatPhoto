@@ -1,0 +1,60 @@
+@inject Assets Toolkit
+@{
+    // The page of a link for people without an account (/s/{token}): no menu, no account – the title of what is shared, who shared it, the grid and the viewer.
+    // The page fills in Title, PageSub, ShareMessage and the section Actions (the ZIP).
+    var title = ViewData["Title"] as string ?? Ui.AppName;
+    var sub = ViewData["PageSub"] as string;
+    var message = ViewData["ShareMessage"] as string;
+}
+<!DOCTYPE html>
+<html @ClientTexts.RootAttributes() data-app="@Ui.AppId">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#f5f4f1" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#151514" media="(prefers-color-scheme: dark)" />
+    <meta name="robots" content="noindex,nofollow" />
+    <meta name="referrer" content="no-referrer" />
+    <title>@title · @Ui.AppName</title>
+    <link rel="icon" type="image/svg+xml" href="~/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="32x32" href="~/img/favicon-32.png" />
+    <script src="~/matui/matui.boot.js" asp-append-version="true"></script>
+    <link rel="stylesheet" href="~/matui/matui.css" asp-append-version="true" />
+    <link rel="stylesheet" href="~/css/app.css" asp-append-version="true" />
+</head>
+<body class="md-share-page">
+    <a class="mat-skip" href="#main">@L["Shell.SkipToContent"]</a>
+    @Html.Raw(Toolkit.Sprite)
+    <header class="md-share-head">
+        <div class="md-share-head__text">
+            <h1 class="md-share-head__title">@title</h1>
+            @if (!string.IsNullOrEmpty(sub))
+            {
+                <p class="md-share-head__sub">@sub</p>
+            }
+        </div>
+        <div class="md-share-head__actions">
+            <partial name="_GridZoom" />
+            @await RenderSectionAsync("Actions", required: false)
+        </div>
+    </header>
+    @if (!string.IsNullOrWhiteSpace(message))
+    {
+        <p class="md-share-message">@message</p>
+    }
+    <main class="md-share-main" id="main">
+        @RenderBody()
+    </main>
+    <footer class="mat-footer mat-footer--plain md-share-foot">
+        <partial name="_LanguageSwitch" />
+        <p class="mat-footer__text">
+            <img class="md-share-foot__mark" src="~/img/logo/matphoto-mark.svg" alt="" width="18" height="18" />
+            @L["Share.Footer", Ui.AppName]
+        </p>
+    </footer>
+    @ClientTexts.Script()
+    <script src="~/matui/matui.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

@@ -104,6 +104,7 @@
                     <div class="mat-card__head"><h2 class="mat-card__title">@Ui.Icon("settings")@L["System.Settings"]</h2></div>
                     <div class="mat-card__body mat-form">
                         <md-field name="RegistrationOpen" kind="switch" label="@L["System.RegistrationOpen"]" value="@Model.RegistrationOpen.ToString()" hint="@L["System.RegistrationOpen.Hint"]" />
+                        <md-field name="SharingEnabled" kind="switch" label="@L["System.Sharing"]" value="@Model.SharingEnabled.ToString()" hint="@L["System.Sharing.Hint"]" />
                         <md-field name="PublicUrl" kind="url" label="@L["System.PublicUrl"]" value="@Model.PublicUrl" placeholder="https://photos.example.com" optional="@(!Model.PublicUrlFixed)" disabled="@Model.PublicUrlFixed" hint="@L[Model.PublicUrlFixed ? "System.PublicUrl.Fixed" : "System.PublicUrl.Hint"]" />
                         <md-field name="MaxUploadMb" kind="number" label="@L["System.MaxUpload"]" value="@Model.MaxUploadMb" min="0" inputmode="numeric" hint="@L["System.MaxUpload.Hint"]" />
                     </div>

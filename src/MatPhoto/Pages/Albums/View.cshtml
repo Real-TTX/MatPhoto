@@ -1,5 +1,6 @@
 @page "/Albums/View/{id:long}"
 @model MatPhoto.Pages.Albums.ViewModel
+@inject MatPhoto.Services.Library.LibrarySettings Library
 @{
     var a = Model.Album;
     var title = a.Title.Length > 0 ? a.Title : a.Name;
@@ -11,6 +12,10 @@
 }
 @section TopActions {
     <partial name="_GridZoom" />
+    @if (Library.Current.SharingEnabled)
+    {
+        <a class="mat-btn mat-btn--ghost mat-btn--icon" href="/Shares/Edit?album=@a.Id" aria-label="@L["Shares.ShareAlbum"]" data-tip="@L["Shares.ShareAlbum"]">@Ui.Icon("link")</a>
+    }
     @if (a.CanEdit && a.Path.Length > 0)
     {
         <a class="mat-btn mat-btn--ghost mat-btn--icon" href="/Albums/Edit?id=@a.Id" aria-label="@L["Albums.Edit"]" data-tip="@L["Albums.Edit"]">@Ui.Icon("edit")</a>

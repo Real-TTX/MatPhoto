@@ -130,6 +130,29 @@ public sealed class LibraryDbTests : IAsyncLifetime
     }
 
     [DbFact]
+    public async Task The_administrator_who_adds_a_storage_may_import_into_it()
+    {
+        var db = _database!.Db;
+        var admin = await _database.AddUserAsync("Ada", UserRole.Admin);
+        var other = await _database.AddUserAsync("Otto", UserRole.Admin);
+        Assert.Empty(await AlbumService.TargetsAsync(db, admin.Id));
+
+        var input = new StorageInput("Alle", StorageKind.Local, Photos, null, null, null, null, null, false, null, null, false, false, false, null,
+            IsReadOnly: false, IsActive: true, IsLibrary: true, ScanIntervalMinutes: 60, ExcludeFolders: null, Note: null);
+        var (id, errors) = await StorageAdmin.SaveAsync(db, _services!.GetRequiredService<StorageConnections>(), admin.Id, null, input);
+        Assert.Empty(errors);
+
+        // a new storage is for everybody to look at (the default), and its maker is an Editor: the import is there at once
+        Assert.Equal([id!.Value], (await AlbumService.TargetsAsync(db, admin.Id)).Select(g => g.Id));
+        Assert.Empty(await AlbumService.TargetsAsync(db, other.Id));
+        Assert.Equal(AccessRole.Viewer, (await StorageAccess.ListForPersonAsync(db, other.Id)).Single().Role);
+
+        // saving it again adds nobody
+        Assert.Empty((await StorageAdmin.SaveAsync(db, _services!.GetRequiredService<StorageConnections>(), other.Id, id, input)).Errors);
+        Assert.Equal([admin.Id], await db.StorageAccess.Where(a => a.StorageId == id).Select(a => a.UserId).ToListAsync());
+    }
+
+    [DbFact]
     public async Task A_moved_file_keeps_its_record_and_a_removed_one_goes()
     {
         var (storage, anna, _) = await SetUpAsync();
@@ -277,6 +300,74 @@ public sealed class LibraryDbTests : IAsyncLifetime
         var items = await LibraryService.ItemsAsync(db, anna.Id, new MediaScope("list", listId), "all", 0, 100);
         Assert.Equal(ids, items!.Select(i => i.Id));
         Assert.Null(await LibraryService.BucketsAsync(db, ben.Id, new MediaScope("list", listId)));
+    }
+
+    [DbFact]
+    public async Task A_link_shows_one_album_or_list_until_it_expires_or_is_withdrawn()
+    {
+        var (storage, anna, ben) = await SetUpAsync();
+        await ScanAsync(storage.Id);
+        var db = _database!.Db;
+        var wedding = await db.Albums.SingleAsync(a => a.Path == "2023.11.09 Hochzeit Julius");
+        var lake = await db.Media.SingleAsync(m => m.FileName == "PXL_1.jpg");
+        var weddingPhoto = await db.Media.FirstAsync(m => m.AlbumId == wedding.Id);
+        var today = Dates.Today(anna.TimeZone);
+
+        // a person shares only what they may see
+        var album = new ShareTarget(true, wedding.Id, wedding.Name);
+        Assert.Null(await ShareService.TargetAsync(db, ben.Id, wedding.Id, null));
+        Assert.Null((await ShareService.CreateAsync(db, ben.Id, album, new ShareInput(null, null, null, false), today)).Id);
+        Assert.NotEmpty((await ShareService.CreateAsync(db, anna.Id, album, new ShareInput(null, null, today.AddDays(-1), false), today)).Errors);
+        var (id, errors) = await ShareService.CreateAsync(db, anna.Id, album, new ShareInput("Unsere Hochzeit", "Viel Spaß!", null, false), today);
+        Assert.Empty(errors);
+        var token = (await ShareService.GetAsync(db, anna.Id, false, id!.Value))!.Token;
+        Assert.True(ShareService.IsToken(token));
+        Assert.Null(await ShareService.GetAsync(db, ben.Id, false, id.Value));
+
+        // a visitor sees the album and nothing else of the library
+        var view = await ShareService.OpenAsync(db, token, true);
+        Assert.NotNull(view);
+        Assert.Equal("Unsere Hochzeit", view.Title);
+        Assert.Equal(["2023-11"], (await LibraryService.BucketsAsync(db, view.OwnerId, view.Scope))!.Select(b => b.Key));
+        Assert.NotNull(await ShareService.FileAsync(db, view, weddingPhoto.Id));
+        Assert.Null(await ShareService.FileAsync(db, view, lake.Id));
+        Assert.Equal(2, (await ShareService.FilesAsync(db, view)).Count);
+        Assert.Null(await ShareService.OpenAsync(db, token, sharingEnabled: false));
+        Assert.Null(await ShareService.OpenAsync(db, ShareService.NewToken(), true));
+        Assert.Null(await ShareService.OpenAsync(db, "../../etc", true));
+        await ShareService.CountVisitAsync(db, view.ShareId);
+        Assert.Equal(1, (await ShareService.GetAsync(db, anna.Id, false, id.Value))!.Views);
+
+        // expired, or the person who shared may not see it any more or is switched off: the link does not open
+        await db.Shares.Where(s => s.Id == id).ExecuteUpdateAsync(u => u.SetProperty(s => s.ExpiresDate, today.AddDays(-1)));
+        db.ChangeTracker.Clear();
+        Assert.Null(await ShareService.OpenAsync(db, token, true));
+        Assert.True((await ShareService.ListAsync(db, anna.Id, false, new ShareCriteria(null, null, "created", true, 1, 25))).Items.Single().Expired);
+        Assert.Empty((await ShareService.SaveAsync(db, anna.Id, id.Value, new ShareInput("Unsere Hochzeit", null, today.AddDays(-1), true), today)).Errors);
+        Assert.Empty((await ShareService.SaveAsync(db, anna.Id, id.Value, new ShareInput("Unsere Hochzeit", null, today.AddDays(7), true), today)).Errors);
+        Assert.True((await ShareService.OpenAsync(db, token, true))!.AllowDownload);
+        await db.StorageAccess.Where(a => a.UserId == anna.Id).ExecuteUpdateAsync(u => u.SetProperty(a => a.Role, AccessRole.None));
+        Assert.Null(await ShareService.OpenAsync(db, token, true));
+        await db.StorageAccess.Where(a => a.UserId == anna.Id).ExecuteUpdateAsync(u => u.SetProperty(a => a.Role, AccessRole.Viewer));
+        await db.Users.Where(u => u.Id == anna.Id).ExecuteUpdateAsync(u => u.SetProperty(x => x.IsActive, false));
+        Assert.Null(await ShareService.OpenAsync(db, token, true));
+        await db.Users.Where(u => u.Id == anna.Id).ExecuteUpdateAsync(u => u.SetProperty(x => x.IsActive, true));
+        Assert.NotNull(await ShareService.OpenAsync(db, token, true));
+
+        // a list: only its photos
+        var (listId, _) = await CollectionService.SaveAsync(db, anna.Id, null, new CollectionInput("Gardasee", null, null, false, null));
+        await CollectionService.AddAsync(db, anna.Id, listId!.Value, [lake.Id]);
+        var (listShare, _) = await ShareService.CreateAsync(db, anna.Id, new ShareTarget(false, listId.Value, "Gardasee"), new ShareInput(null, null, null, false), today);
+        var listView = await ShareService.OpenAsync(db, (await ShareService.GetAsync(db, anna.Id, false, listShare!.Value))!.Token, true);
+        Assert.Equal("Gardasee", listView!.Title);
+        Assert.NotNull(await ShareService.FileAsync(db, listView, lake.Id));
+        Assert.Null(await ShareService.FileAsync(db, listView, weddingPhoto.Id));
+
+        // withdrawn: only by the person who made it (or an administrator)
+        Assert.Null(await ShareService.DeleteAsync(db, ben.Id, false, id.Value));
+        Assert.Equal(token, await ShareService.DeleteAsync(db, anna.Id, false, id.Value));
+        Assert.Null(await ShareService.OpenAsync(db, token, true));
+        Assert.Single((await ShareService.ListAsync(db, anna.Id, false, new ShareCriteria(null, null, "created", true, 1, 25))).Items);
     }
 
     [DbFact]

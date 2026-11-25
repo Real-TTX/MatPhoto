@@ -101,6 +101,8 @@
   "Activity.Action.trash": { "en": "Moved to the trash", "de": "In den Papierkorb" },
   "Activity.Action.storage": { "en": "Storage", "de": "Speicher" },
   "Activity.Action.setting": { "en": "Settings", "de": "Einstellungen" },
+  "Activity.Action.person": { "en": "Person", "de": "Person" },
+  "Activity.Action.share": { "en": "Shared link", "de": "Geteilter Link" },
   "Connections.Title": { "en": "Connections", "de": "Verbindungen" },
   "Connections.Sub": { "en": "What MatPhoto uses from other apps and adds to a home screen", "de": "Was MatPhoto von anderen Apps nutzt und einem Home-Screen hinzufügt" },
   "Roles.Viewer": { "en": "Viewer", "de": "Betrachter" },

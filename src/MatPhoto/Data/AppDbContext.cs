@@ -31,6 +31,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, Current
 
     public DbSet<DuplicateDismissal> DuplicateDismissals => Set<DuplicateDismissal>();
 
+    public DbSet<Share> Shares => Set<Share>();
+
     public DbSet<Person> People => Set<Person>();
 
     public DbSet<Face> Faces => Set<Face>();
@@ -177,6 +179,22 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, Current
             e.HasIndex(x => x.MediaId);
             e.HasOne(x => x.Collection).WithMany(x => x.Items).HasForeignKey(x => x.CollectionId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne(x => x.Media).WithMany().HasForeignKey(x => x.MediaId).OnDelete(DeleteBehavior.Cascade);
+        });
+
+        b.Entity<Share>(e =>
+        {
+            e.ToTable("Share");
+            e.HasIndex(x => x.Token).IsUnique();
+            e.HasIndex(x => x.OwnerId);
+            e.HasIndex(x => x.AlbumId);
+            e.HasIndex(x => x.CollectionId);
+            e.HasOne(x => x.Owner).WithMany().HasForeignKey(x => x.OwnerId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Album).WithMany().HasForeignKey(x => x.AlbumId).OnDelete(DeleteBehavior.Cascade);
+            e.HasOne(x => x.Collection).WithMany().HasForeignKey(x => x.CollectionId).OnDelete(DeleteBehavior.Cascade);
+            e.Property(x => x.Token).HasMaxLength(64);
+            e.Property(x => x.Title).HasMaxLength(200);
+            e.Property(x => x.Message).HasMaxLength(2000);
+            e.HasQueryFilter(x => x.UpdateState != SoftEntity.Deleted);
         });
 
         b.Entity<DuplicateDismissal>(e =>

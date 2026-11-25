@@ -9,11 +9,11 @@ namespace MatPhoto.Services.Auth;
 /// <summary>
 /// The data of a person under the GDPR: the export of everything that is about them (Art. 15 and 20, a JSON file), and the erasure of the account (Art. 17).
 /// <para>
-/// The export holds the account and its settings, the favourites (the paths of the photos), the lists with their photos, the imports, the activity of the person and
+/// The export holds the account and its settings, the favourites (the paths of the photos), the lists with their photos, the shared links (without their secret), the imports, the activity of the person and
 /// the sessions. No secret: no password hash, no token. The photos themselves lie in the storages (the person downloads them there or in the viewer).
 /// </para>
 /// <para>
-/// The erasure deletes for good: the account, its sessions, favourites, lists and imports (with their uploads). The photos a person imported stay in their albums:
+/// The erasure deletes for good: the account, its sessions, favourites, lists, shared links and imports (with their uploads). The photos a person imported stay in their albums:
 /// they belong to the storage, not to the account.
 /// </para>
 /// </summary>
@@ -55,6 +55,9 @@ public sealed class AccountDataService(AppDbContext db, IConfiguration configura
                     c.Name, c.Description, c.Colour, c.IsShared, c.CreateDate,
                     Photos = c.Items.OrderBy(i => i.Position).Select(i => new { Storage = i.Media!.Storage!.Name, i.Media.Path }).ToList(),
                 }).ToListAsync(ct),
+            SharedLinks = await db.Shares.AsNoTracking().Where(s => s.OwnerId == userId)
+                .Select(s => new { s.Title, s.Message, Album = s.Album!.Name, List = s.Collection!.Name, s.ExpiresDate, s.AllowDownload, s.ViewCount, s.LastViewedDate, s.CreateDate })
+                .ToListAsync(ct),
             Imports = await db.ImportSessions.AsNoTracking().Where(s => s.UserId == userId).OrderByDescending(s => s.CreateDate)
                 .Select(s => new { s.CreateDate, s.Source, s.State, s.TotalCount, s.ImportedCount, s.SkippedCount, s.FailedCount, s.FinishedDate }).ToListAsync(ct),
             Activity = await db.Activities.AsNoTracking().Where(a => a.UserId == userId).OrderByDescending(a => a.OccurredDate).Take(5000)
@@ -75,6 +78,7 @@ public sealed class AccountDataService(AppDbContext db, IConfiguration configura
             await db.Activities.Where(a => a.UserId == userId).ExecuteDeleteAsync(ct);
             await db.Favorites.Where(f => f.UserId == userId).ExecuteDeleteAsync(ct);
             await db.CollectionItems.Where(i => i.Collection!.OwnerId == userId).ExecuteDeleteAsync(ct);
+            await db.Shares.IgnoreQueryFilters().Where(s => s.OwnerId == userId).ExecuteDeleteAsync(ct);
             await db.Collections.IgnoreQueryFilters().Where(c => c.OwnerId == userId).ExecuteDeleteAsync(ct);
             await db.ImportSessions.Where(s => s.UserId == userId).ExecuteDeleteAsync(ct);
             await db.Users.IgnoreQueryFilters().Where(u => u.Id == userId).ExecuteDeleteAsync(ct);

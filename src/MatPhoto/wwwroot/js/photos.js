@@ -3,7 +3,8 @@
    near the screen hold their tiles (a library of 100,000 photos is a few hundred elements in the page). Inside a month the days have their head, the photos lie in
    justified rows (the height of a row follows its photos, so nothing is cropped more than needed). The selection: a tick on a tile, Shift for a range, a long press
    on a touch screen. The viewer: the preview of the cache, the original of a video (with ranges), the next and the previous photo loaded ahead, swipe, keys, zoom,
-   the info panel, favourites, lists, the trash. */
+   the info panel, favourites, lists, the trash. On the page of a link (/s/{token}) the same grid and viewer read from the link, without selection, favourites,
+   lists and the trash, and download only when the link allows it. */
 import { t, el, icon, request, toast } from './util.js';
 
 const GAP = 4;
@@ -12,9 +13,11 @@ const PHONE = 600;
 const sizeKey = 'md-grid-size';
 
 const reduceMotion = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-const thumbUrl = item => `/media/${item.i}/thumb?v=${item.k}`;
-const previewUrl = item => `/media/${item.i}/preview?v=${item.k}`;
-const originalUrl = id => `/media/${id}/original`;
+// the addresses: of the library, or of a link for people without an account (/s/{token}/…, set by the grid of such a page)
+let base = '';
+const thumbUrl = item => `${base}/media/${item.i}/thumb?v=${item.k}`;
+const previewUrl = item => `${base}/media/${item.i}/preview?v=${item.k}`;
+const originalUrl = id => `${base}/media/${id}/original`;
 const lang = () => document.documentElement.lang || 'en';
 
 function duration(ms) {
@@ -56,6 +59,10 @@ class PhotoGrid {
     this.scope = root.dataset.scope || 'all';
     this.listId = root.dataset.list || '';
     this.days = root.dataset.days !== '0';
+    // the page of a link: read from the link, nothing to select, mark or move
+    this.share = root.dataset.share || '';
+    this.canDownload = !this.share || root.dataset.download === '1';
+    if (this.share) base = `/s/${encodeURIComponent(this.share)}`;
     this.canvas = root.querySelector('[data-grid-canvas]');
     this.status = root.querySelector('[data-grid-status]');
     this.scroller = root.closest('.mat-main') || document.scrollingElement;
@@ -72,13 +79,13 @@ class PhotoGrid {
   }
 
   get target() {
-    const base = SIZES[this.size] || SIZES.m;
-    return window.innerWidth < PHONE ? Math.round(base * 0.62) : base;
+    const height = SIZES[this.size] || SIZES.m;
+    return window.innerWidth < PHONE ? Math.round(height * 0.62) : height;
   }
 
   async start() {
     try {
-      const data = await request('GET', `/live/timeline?scope=${encodeURIComponent(this.scope)}`);
+      const data = await request('GET', `${base}/live/timeline?scope=${encodeURIComponent(this.scope)}`);
       this.status.hidden = true;
       if (!data.buckets.length) {
         this.root.querySelector('[data-grid-empty]').hidden = false;
@@ -96,7 +103,8 @@ class PhotoGrid {
 
   wire() {
     const schedule = () => { if (!this.frame) this.frame = requestAnimationFrame(() => { this.frame = 0; this.render(); }); };
-    this.scroller.addEventListener('scroll', schedule, { passive: true });
+    // the page scrolls in its main area (the app) or as a whole (the page of a link): then the events come to the window
+    (this.scroller === document.scrollingElement ? window : this.scroller).addEventListener('scroll', schedule, { passive: true });
     new ResizeObserver(() => { const w = this.canvas.clientWidth; if (w && Math.abs(w - this.width) > 1) { this.measure(); this.render(); } }).observe(this.canvas);
     document.addEventListener('md:grid-size', e => { this.size = e.detail; this.measure(); this.render(); });
     window.addEventListener('popstate', () => { if (!location.hash.startsWith('#m') && this.viewer) this.viewer.close(true); else this.openFromHash(); });
@@ -109,7 +117,7 @@ class PhotoGrid {
     // a long press selects on a touch screen
     let timer = 0, pressed = null;
     this.canvas.addEventListener('pointerdown', e => {
-      if (e.pointerType !== 'touch') return;
+      if (e.pointerType !== 'touch' || this.share) return;
       const tile = e.target.closest('.md-tile');
       if (!tile) return;
       pressed = tile;
@@ -138,7 +146,7 @@ class PhotoGrid {
     e.preventDefault();
     const id = Number(tile.dataset.id);
     if (tile.dataset.pressed) { delete tile.dataset.pressed; return; }
-    if (check || e.shiftKey || e.ctrlKey || e.metaKey || this.selected.size > 0) {
+    if (!this.share && (check || e.shiftKey || e.ctrlKey || e.metaKey || this.selected.size > 0)) {
       this.toggle(id, e.shiftKey);
       return;
     }
@@ -146,6 +154,7 @@ class PhotoGrid {
   }
 
   toggle(id, range) {
+    if (this.share) return;
     if (range && this.anchor !== null) {
       const flat = this.flat();
       const a = flat.findIndex(x => x.i === this.anchor), b = flat.findIndex(x => x.i === id);
@@ -268,7 +277,7 @@ class PhotoGrid {
       const items = [];
       try {
         while (items.length < s.count) {
-          const data = await request('GET', `/live/items?scope=${encodeURIComponent(this.scope)}&bucket=${s.key}&offset=${items.length}&limit=1000`);
+          const data = await request('GET', `${base}/live/items?scope=${encodeURIComponent(this.scope)}&bucket=${s.key}&offset=${items.length}&limit=1000`);
           items.push(...data.items);
           if (data.items.length < 1000) break;
         }
@@ -301,7 +310,7 @@ class PhotoGrid {
         node.append(head);
       } else if (b.kind === 'day') {
         const head = el('div', { class: 'md-day' },
-          el('button', { type: 'button', class: 'md-day__check', 'aria-label': t('Grid.SelectDay', dayLabel(b.day)), dataset: { daySelect: JSON.stringify(b.ids) } }, icon('check')),
+          this.share ? null : el('button', { type: 'button', class: 'md-day__check', 'aria-label': t('Grid.SelectDay', dayLabel(b.day)), dataset: { daySelect: JSON.stringify(b.ids) } }, icon('check')),
           el('span', { class: 'md-day__title', text: dayLabel(b.day) }));
         head.style.top = b.y + 'px';
         node.append(head);
@@ -319,7 +328,7 @@ class PhotoGrid {
     const label = (item.v ? t('Grid.Video') : t('Grid.Photo')) + ', ' + new Date(item.d).toLocaleString(lang(), { dateStyle: 'medium', timeStyle: 'short' });
     const node = el('a', { class: 'md-tile' + (on ? ' is-selected' : '') + (item.t ? '' : ' is-missing'), href: `#m${item.i}`, role: 'listitem', draggable: 'false', 'aria-label': label, dataset: { id: item.i } },
       item.t ? el('img', { src: thumbUrl(item), alt: '', loading: 'lazy', decoding: 'async', draggable: 'false' }) : icon(item.v ? 'video' : 'image', 'md-tile__placeholder'),
-      el('span', { class: 'md-tile__check', role: 'button', tabindex: '-1', 'aria-pressed': on ? 'true' : 'false', 'aria-label': t('Grid.Select'), dataset: { tileCheck: '1' } }, icon('check')),
+      this.share ? null : el('span', { class: 'md-tile__check', role: 'button', tabindex: '-1', 'aria-pressed': on ? 'true' : 'false', 'aria-label': t('Grid.Select'), dataset: { tileCheck: '1' } }, icon('check')),
       item.v ? el('span', { class: 'md-tile__badge' }, icon('play'), el('span', { text: duration(item.v) })) : null,
       item.l ? el('span', { class: 'md-tile__badge md-tile__badge--live', title: 'Live' }, icon('live')) : null,
       item.f ? el('span', { class: 'md-tile__fav', 'aria-label': t('Grid.IsFavorite') }, icon('heart')) : null);
@@ -575,6 +584,7 @@ class Viewer {
 
   build() {
     const button = (name, label, ico, extra = {}) => el('button', { type: 'button', class: 'md-viewer__btn', 'aria-label': label, title: label, dataset: { v: name }, ...extra }, icon(ico));
+    const share = !!this.grid.share;
     this.title = el('div', { class: 'md-viewer__title' }, el('strong', { 'data-v-title': '' }), el('small', { 'data-v-sub': '' }));
     this.favButton = button('favorite', t('Viewer.Favorite'), 'heart', { 'aria-pressed': 'false' });
     this.infoButton = button('info', t('Viewer.Info'), 'info', { 'aria-pressed': 'false' });
@@ -592,10 +602,11 @@ class Viewer {
           this.liveButton,
           button('slideshow', t('Viewer.Slideshow'), 'slideshow', { 'aria-pressed': 'false' }),
           button('zoom', t('Viewer.Zoom'), 'zoom-in'),
-          this.favButton,
-          button('list', t('Grid.AddToList'), 'list-plus'),
-          button('download', t('Viewer.Download'), 'download'),
-          this.trashButton,
+          // a visitor of a link marks nothing, puts nothing on a list and moves nothing; downloads only when the link allows them
+          share ? null : this.favButton,
+          share ? null : button('list', t('Grid.AddToList'), 'list-plus'),
+          this.grid.canDownload ? button('download', t('Viewer.Download'), 'download') : null,
+          share ? null : this.trashButton,
           this.infoButton)),
       el('div', { class: 'md-viewer__body' }, this.stage, this.prev, this.next, this.info));
     // the info panel opens as it was left (on a wide screen)
@@ -626,7 +637,7 @@ class Viewer {
     this.paint(item);
     this.preload();
     try {
-      const detail = await request('GET', `/live/media/${id}`);
+      const detail = await request('GET', `${base}/live/media/${id}`);
       if (this.id !== id) return;
       this.detail = detail;
       this.describe(detail);
@@ -645,8 +656,10 @@ class Viewer {
     this.liveButton.hidden = !(item?.l || detail?.live);
     if (isVideo) {
       const video = el('video', { class: 'md-viewer__video', controls: true, autoplay: true, playsinline: true, preload: 'metadata', src: originalUrl(id) });
-      if (k) video.poster = `/media/${id}/preview?v=${k}`;
+      if (k) video.poster = `${base}/media/${id}/preview?v=${k}`;
       video.addEventListener('error', () => {
+        // the error of a video can come after the viewer has gone on to the next photo
+        if (this.id !== id || !video.isConnected) return;
         this.stage.append(el('p', { class: 'md-viewer__note', text: t('Viewer.VideoUnsupported') }));
       }, { once: true });
       this.stage.append(video);
@@ -659,7 +672,7 @@ class Viewer {
       const full = this.cache.get(id) || this.load(item);
       full.then(src => { if (this.id === id && src) img.src = src; });
     } else if (k) {
-      img.src = `/media/${id}/preview?v=${k}`;
+      img.src = `${base}/media/${id}/preview?v=${k}`;
     }
     img.addEventListener('error', () => { if (this.id === id) this.stage.replaceChildren(el('div', { class: 'md-viewer__missing' }, icon('image'), el('p', { text: t('Viewer.NoPreview') }))); }, { once: true });
     this.stage.append(img);
@@ -760,7 +773,7 @@ class Viewer {
       toast(message, 'success');
       this.names = null;
       if (this.id !== id) return;
-      try { this.detail = await request('GET', `/live/media/${id}`); this.describe(this.detail); } catch { /* the next photo shows it */ }
+      try { this.detail = await request('GET', `${base}/live/media/${id}`); this.describe(this.detail); } catch { /* the next photo shows it */ }
     };
     cancel.onclick = () => { form.hidden = true; form.replaceChildren(); };
     nobody.onclick = async () => {
@@ -847,7 +860,7 @@ class Viewer {
     else if (e.key === 'ArrowRight') { e.preventDefault(); this.go(1); }
     else if (e.key === 'ArrowLeft') { e.preventDefault(); this.go(-1); }
     else if (e.key === 'i') this.action('info');
-    else if (e.key === 'f') this.action('favorite');
+    else if (e.key === 'f' && !this.grid.share) this.action('favorite');
     else if (e.key === 'z') this.toggleZoom();
     else if (e.key === ' ' && !this.stage.querySelector('video')) { e.preventDefault(); this.toggleSlideshow(); }
   }
@@ -902,7 +915,7 @@ class Viewer {
     if (!img) return;
     if (this.zoom > 1) { this.resetZoom(); return; }
     // the original where the browser can show it (full resolution), else the preview made larger
-    if (this.detail?.browserCanShow && this.detail.type === 'photo') img.src = originalUrl(this.id);
+    if (this.detail?.browserCanShow && this.detail.type === 'photo' && this.detail.canDownload) img.src = originalUrl(this.id);
     this.zoom = 2.5;
     img.classList.add('is-zoomed');
     img.style.transform = `scale(${this.zoom})`;

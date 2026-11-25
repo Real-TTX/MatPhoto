@@ -25,6 +25,10 @@
 }
 else
 {
+    @if (!Model.CanImport && Me.IsAdmin)
+    {
+        <div class="mat-alert mat-alert--info" role="note">@Ui.Icon("import")<div class="mat-alert__body">@L["Photos.NoImport"] <a href="/Admin/Storages">@L["Photos.NoImport.Link"]</a></div></div>
+    }
     @if (Model.Pending > 0)
     {
         <div class="mat-alert mat-alert--info" role="status">@Ui.Icon("refresh")<div class="mat-alert__body">@L["Photos.Pending", Model.Pending]</div></div>
